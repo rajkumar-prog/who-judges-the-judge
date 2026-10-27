@@ -6,7 +6,7 @@ import json, os
 from openai import OpenAI
 
 MODEL = "meta-models/muse-spark-open-1026"  # hackathon id from the participant guide
-BASE_URL = os.environ.get("BASETEN_BASE_URL", "https://inference.baseten.co/v1")  # verify in Baseten quickstart
+BASE_URL = os.environ.get("BASETEN_BASE_URL", "https://inference.baseten.co/v1")  # confirmed by Baseten staff in Discord
 PRICE_IN, PRICE_OUT = 1.25, 4.25  # $/M tokens, third-party list price; Baseten may differ
 
 DIFF = """--- a/tests/test_pricing.py
