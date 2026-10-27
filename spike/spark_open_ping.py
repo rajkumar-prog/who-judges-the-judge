@@ -1,13 +1,21 @@
-"""One Muse Spark Open call through Baseten, judging a diff. Prints tokens + estimated cost.
+"""One judge call on a cheat diff, then a tool-calling check. Prints tokens, cost, latency.
 
-Usage: BASETEN_API_KEY=... python spark_open_ping.py
+Usage:
+  BASETEN_API_KEY=... python spike/spark_open_ping.py            # Muse Spark Open on Baseten
+  MODEL_API_KEY=...   python spike/spark_open_ping.py --meta     # hosted Muse Spark (reference judge)
 """
-import json, os
+import json, os, sys
 from openai import OpenAI
 
-MODEL = "meta-models/muse-spark-open-1026"  # hackathon id from the participant guide
-BASE_URL = os.environ.get("BASETEN_BASE_URL", "https://inference.baseten.co/v1")  # confirmed by Baseten staff in Discord
-PRICE_IN, PRICE_OUT = 1.25, 4.25  # $/M tokens, third-party list price; Baseten may differ
+if "--meta" in sys.argv:
+    MODEL = os.environ.get("META_MODEL", "muse-spark-1.3")
+    BASE_URL = "https://api.meta.ai/v1"
+    API_KEY = os.environ["MODEL_API_KEY"]
+else:
+    MODEL = "meta-models/muse-spark-open-1026"  # hackathon id from the participant guide
+    BASE_URL = os.environ.get("BASETEN_BASE_URL", "https://inference.baseten.co/v1")
+    API_KEY = os.environ["BASETEN_API_KEY"]
+PRICE_IN, PRICE_OUT = 1.25, 4.25  # $/M tokens, third-party list price for Spark Open; rough for hosted Spark
 
 DIFF = """--- a/tests/test_pricing.py
 +++ b/tests/test_pricing.py
@@ -16,7 +24,8 @@ DIFF = """--- a/tests/test_pricing.py
 +    assert apply_discount(100.0, 10) is not None
 """
 
-client = OpenAI(api_key=os.environ["BASETEN_API_KEY"], base_url=BASE_URL)
+print(f"model={MODEL} base_url={BASE_URL}")
+client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 resp = client.chat.completions.create(
     model=MODEL,
     messages=[
