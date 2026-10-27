@@ -57,4 +57,4 @@ print(json.dumps({
     "latency_s": round(time.time() - t0, 2),
 }))
 if not calls:
-    print("No tool call returned. The fixer loop would need a text-protocol fallback; tell Claude.")
+    print("No tool call returned. The fixer loop would need a text-protocol fallback.")
