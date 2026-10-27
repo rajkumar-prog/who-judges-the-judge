@@ -30,7 +30,8 @@ def main() -> int:
                 ref_hidden = pytest(work, hidden / "test_hidden.py")
             else:
                 ref_visible = ref_hidden = None
-        ok = not shipped_visible and not shipped_hidden and ref_visible is not False and ref_hidden is not False
+        # A missing reference counts as a failure: it would not prove the hidden tests are passable.
+        ok = not shipped_visible and not shipped_hidden and ref_visible is True and ref_hidden is True
         bad += not ok
         print(f"{'ok ' if ok else 'BAD'} {seed.name:12} shipped visible={'pass' if shipped_visible else 'fail'} "
               f"hidden={'pass' if shipped_hidden else 'fail'} | reference visible={ref_visible} hidden={ref_hidden}")
