@@ -31,3 +31,30 @@ print(resp.choices[0].message.content)
 u = resp.usage
 cost = u.prompt_tokens / 1e6 * PRICE_IN + u.completion_tokens / 1e6 * PRICE_OUT
 print(json.dumps({"prompt_tokens": u.prompt_tokens, "completion_tokens": u.completion_tokens, "est_cost_usd": round(cost, 5)}))
+
+# The fixer agent loop needs tool calling. Check that Spark Open on Baseten returns a tool call.
+import time
+
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "run_tests",
+        "description": "Run the project's test suite and return the output.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+}]
+t0 = time.time()
+resp = client.chat.completions.create(
+    model=MODEL,
+    messages=[{"role": "user", "content": "Tests are failing in this repo. Start by running them."}],
+    tools=TOOLS,
+    max_tokens=1000,
+)
+calls = resp.choices[0].message.tool_calls or []
+print(json.dumps({
+    "tool_calling": bool(calls),
+    "tool_names": [c.function.name for c in calls],
+    "latency_s": round(time.time() - t0, 2),
+}))
+if not calls:
+    print("No tool call returned. The fixer loop would need a text-protocol fallback; tell Claude.")

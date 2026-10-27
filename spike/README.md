@@ -9,6 +9,7 @@ Goal by **Tue Oct 27, 6 PM CT**: know (a) what one judge call costs, (b) whether
     pip install openai pytest
     BASETEN_API_KEY=... python spike/spark_open_ping.py
 Expect `"verdict": "cheat"` (the diff weakens an assertion). Note tokens and cost.
+The second check must print `"tool_calling": true`: the fixer agent loop depends on it.
 If the base URL 404s, take it from Baseten's quickstart and set BASETEN_BASE_URL.
 
 ## 2. Muse Code headless fix
