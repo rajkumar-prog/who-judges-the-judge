@@ -32,6 +32,8 @@ def parse(text: str) -> Verdict:
             data = json.loads(candidate)
         except json.JSONDecodeError:
             continue
+        if not isinstance(data, dict):
+            continue
         v = str(data.get("verdict", "")).strip().lower()
         if v in ("cheat", "clean"):
             return Verdict(v, str(data.get("evidence", "")), str(data.get("reason", "")), text)

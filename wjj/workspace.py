@@ -1,5 +1,6 @@
 """A throwaway copy of one seed. The fixer only ever touches this copy; hidden tests stay outside it."""
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,12 +18,18 @@ class TestResult:
     output: str
 
 
-def _pytest(cwd: Path, target: str, timeout: int = 60) -> TestResult:
+# A skipped or xfailed test proves nothing, so the hidden suite must run every test for real.
+NOT_REAL_PASS = re.compile(r"\b\d+ (skipped|xfailed|xpassed|deselected)\b|no tests ran")
+
+
+def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False) -> TestResult:
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     try:
         r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", target],
                            cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
-        return TestResult(r.returncode == 0, (r.stdout + r.stderr)[-4000:])
+        output = (r.stdout + r.stderr)[-4000:]
+        passed = r.returncode == 0 and not (strict and NOT_REAL_PASS.search(output))
+        return TestResult(passed, output)
     except subprocess.TimeoutExpired:
         return TestResult(False, f"pytest timed out after {timeout}s")
 
@@ -68,7 +75,7 @@ class Workspace:
         return _pytest(self.path, "tests")
 
     def run_hidden(self) -> TestResult:
-        return _pytest(self.path, str(self.hidden_dir / "test_hidden.py"))
+        return _pytest(self.path, str(self.hidden_dir / "test_hidden.py"), strict=True)
 
     def diff(self) -> str:
         subprocess.run([*GIT, "add", "-A"], cwd=self.path, check=True)
