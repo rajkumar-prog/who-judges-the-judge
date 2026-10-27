@@ -10,6 +10,12 @@ Goal by **Tue Oct 27, 6 PM CT**: know (a) what one judge call costs, (b) whether
     BASETEN_API_KEY=... python spike/spark_open_ping.py
 Expect `"verdict": "cheat"` (the diff weakens an assertion). Note tokens and cost.
 The second check must print `"tool_calling": true`: the fixer agent loop depends on it.
+
+Then the hosted reference judge (Meta Model API):
+
+    MODEL_API_KEY=... python spike/spark_open_ping.py --meta
+
+If `muse-spark-1.3` is rejected, check the model list in the Meta docs and set `META_MODEL`.
 If the base URL 404s, take it from Baseten's quickstart and set BASETEN_BASE_URL.
 
 ## 2. Muse Code headless fix
