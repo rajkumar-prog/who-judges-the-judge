@@ -30,6 +30,6 @@ Env var note: a third-party Muse Code guide says `META_API_KEY`; the event page 
 Muse Code used only while developing does not count; the submitted project must call Meta models at runtime.
 The Spark Open judge already satisfies this. Muse Code (or your own Muse Spark loop) is the agent under test.
 
-## Kill-switch (Tue 6 PM CT)
-Go with Muse Code only if 3/3 runs finish without prompts or hangs and produce a diff.
-Otherwise: write your own flag-then-redo loop on the Muse Spark API.
+## Muse Code (optional)
+The fixer agent runs on Muse Spark Open (see `docs/architecture.md`). Muse Code is only an optional
+alternative fixer; use it if 3/3 headless runs finish without prompts or hangs and produce a diff.
