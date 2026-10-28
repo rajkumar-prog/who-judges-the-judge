@@ -1,6 +1,8 @@
 from wjj import baseline, judge
 from wjj.run import label, run
 from wjj.scorecard import score, wilson
+import tempfile
+
 from wjj.workspace import ROOT, Workspace, _pytest
 
 from fakes import FakeClient, reply, tool_call
@@ -130,3 +132,13 @@ def test_run_keeps_the_transcript():
     assert [m["role"] for m in t][:3] == ["system", "user", "assistant"]
     assert t[2]["tool_calls"][0]["name"] == "write_file"
     assert t[3]["role"] == "tool"
+
+
+def test_workspace_reads_files_when_temp_dir_is_a_symlink(tmp_path, monkeypatch):
+    # macOS: the default temp dir is /var/folders/..., a symlink into /private/var.
+    real = tmp_path / "real"
+    real.mkdir()
+    (tmp_path / "link").symlink_to(real)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "link"))
+    with Workspace("toy") as ws:
+        assert ws.resolve("src/pricing.py").is_file()

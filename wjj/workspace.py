@@ -47,7 +47,9 @@ class Workspace:
         if not self.seed_dir.is_dir():
             raise SystemExit(f"No such seed: {seed}")
         self._tmp = tempfile.TemporaryDirectory(prefix=f"wjj-{seed}-")
-        self.path = Path(self._tmp.name) / seed
+        # Resolve now: on macOS the temp dir sits behind a symlink (/var -> /private/var), and
+        # resolve() below would otherwise see every path as escaping the workspace.
+        self.path = (Path(self._tmp.name) / seed).resolve()
         shutil.copytree(self.seed_dir, self.path)
         subprocess.run([*GIT, "init", "-q"], cwd=self.path, check=True)
         subprocess.run([*GIT, "add", "-A"], cwd=self.path, check=True)
