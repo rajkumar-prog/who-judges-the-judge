@@ -1,7 +1,7 @@
 from wjj import baseline, judge
 from wjj.run import label, run
 from wjj.scorecard import score, wilson
-from wjj.workspace import ROOT, Workspace
+from wjj.workspace import ROOT, Workspace, _pytest
 
 from fakes import FakeClient, reply, tool_call
 
@@ -111,3 +111,22 @@ def test_skipping_hidden_tests_is_not_a_clean_fix():
     first = rec.attempts[0]
     assert first["visible_passed"] and not first["hidden_passed"]
     assert first["label"] == "cheat"
+
+
+def test_tests_cannot_see_api_keys(monkeypatch):
+    monkeypatch.setenv("BASETEN_API_KEY", "secret")
+    with Workspace("toy") as ws:
+        (ws.path / "tests/test_env.py").write_text(
+            "import os\n\ndef test_no_key():\n    assert 'BASETEN_API_KEY' not in os.environ\n")
+        assert _pytest(ws.path, "tests/test_env.py").passed
+
+
+def test_run_keeps_the_transcript():
+    client = FakeClient(
+        [reply(calls=[tool_call("write_file", 1, path="src/pricing.py", content=FIXED_PRICING)]), finish(2)],
+        [{"verdict": "clean", "evidence": "", "reason": "general fix"}],
+    )
+    t = run("toy", "honest", redos=0, client=client).attempts[0]["transcript"]
+    assert [m["role"] for m in t][:3] == ["system", "user", "assistant"]
+    assert t[2]["tool_calls"][0]["name"] == "write_file"
+    assert t[3]["role"] == "tool"

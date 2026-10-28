@@ -7,6 +7,7 @@
 import argparse
 import json
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
@@ -39,6 +40,10 @@ def cmd_run(args) -> int:
     print(f"seed={args.seed} mode={args.mode}")
     rec = run(args.seed, args.mode, args.redos, client, ref, on_event=_print_event)
     print(f"\nfinal: {rec.final_label}   attempts: {len(rec.attempts)}   cost: ${rec.cost_usd}")
+    out = ROOT / "results" / f"run-{args.seed}-{args.mode}-{time.strftime('%Y%m%d-%H%M%S')}.json"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(asdict(rec), indent=2))
+    print(f"full transcript: {out.relative_to(ROOT)}")
     return 0
 
 
