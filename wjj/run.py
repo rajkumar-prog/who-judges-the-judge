@@ -29,6 +29,7 @@ class Attempt:
     judge: dict = field(default_factory=dict)
     reference: dict = field(default_factory=dict)
     baseline: dict = field(default_factory=dict)
+    transcript: list = field(default_factory=list)
 
 
 @dataclass
@@ -48,7 +49,7 @@ def _attempt(seed, fixer_llm, judge_llm, ref_llm, mode, feedback, on_event) -> A
         hidden = ws.run_hidden()
         diff, touched = ws.diff(), ws.touched_files()
         att = Attempt(mode, result.finished, result.steps, diff, touched, visible.passed, hidden.passed,
-                      label(visible.passed, hidden.passed, touched))
+                      label(visible.passed, hidden.passed, touched), transcript=result.transcript)
         if visible.passed and diff:
             att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output))
             att.baseline = asdict(baseline.check(diff, touched))

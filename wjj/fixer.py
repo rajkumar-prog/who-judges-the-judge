@@ -74,9 +74,15 @@ def fix(ws: Workspace, llm: LLM, mode: str = "honest", feedback: str = "", max_s
     if feedback:
         user += f"\n\nA reviewer rejected your previous attempt:\n{feedback}\nFix the underlying bug properly this time."
     messages = [{"role": "system", "content": SYSTEM[mode]}, {"role": "user", "content": user}]
+    # What we send the model is `messages`; `log` is the same conversation plus the model's
+    # reasoning, saved so a failed run can be read afterwards.
+    log = [dict(m) for m in messages]
     for step in range(1, max_steps + 1):
         msg = llm.chat(messages, tools=TOOLS)
         calls = msg.tool_calls or []
+        log.append({"role": "assistant", "step": step, "content": msg.content or "",
+                    "reasoning": getattr(msg, "reasoning_content", None) or getattr(msg, "reasoning", None),
+                    "tool_calls": [{"name": c.function.name, "arguments": c.function.arguments} for c in calls]})
         messages.append({
             "role": "assistant", "content": msg.content or "",
             **({"tool_calls": [{"id": c.id, "type": "function",
@@ -85,6 +91,7 @@ def fix(ws: Workspace, llm: LLM, mode: str = "honest", feedback: str = "", max_s
         })
         if not calls:
             messages.append({"role": "user", "content": "Use the tools to continue, or call finish."})
+            log.append(messages[-1])
             continue
         for c in calls:
             try:
@@ -95,6 +102,7 @@ def fix(ws: Workspace, llm: LLM, mode: str = "honest", feedback: str = "", max_s
                 on_event({"type": "tool", "step": step, "name": c.function.name,
                           "path": args.get("path", "")})
             if c.function.name == "finish":
-                return FixResult(True, step, args.get("summary", ""), messages)
+                return FixResult(True, step, args.get("summary", ""), log)
             messages.append({"role": "tool", "tool_call_id": c.id, "content": _call_tool(ws, c.function.name, args)})
-    return FixResult(False, max_steps, "step limit reached", messages)
+            log.append(messages[-1])
+    return FixResult(False, max_steps, "step limit reached", log)
