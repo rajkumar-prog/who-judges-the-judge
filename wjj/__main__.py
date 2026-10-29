@@ -43,7 +43,8 @@ def cmd_run(args) -> int:
     out = ROOT / "results" / f"run-{args.seed}-{args.mode}-{time.strftime('%Y%m%d-%H%M%S')}.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(asdict(rec), indent=2))
-    print(f"full transcript: {out.relative_to(ROOT)}")
+    (out.parent / "latest.json").write_text(out.read_text())
+    print(f"full transcript: {out.relative_to(ROOT)} (also results/latest.json)")
     return 0
 
 

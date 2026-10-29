@@ -116,10 +116,11 @@ def test_skipping_hidden_tests_is_not_a_clean_fix():
 
 
 def test_tests_cannot_see_api_keys(monkeypatch):
-    monkeypatch.setenv("BASETEN_API_KEY", "secret")
+    for name in ("BASETEN_API_KEY", "MODEL_API_KEY", "META_MODEL", "SOME_OTHER_TOKEN"):
+        monkeypatch.setenv(name, "secret")
     with Workspace("toy") as ws:
         (ws.path / "tests/test_env.py").write_text(
-            "import os\n\ndef test_no_key():\n    assert 'BASETEN_API_KEY' not in os.environ\n")
+            "import os\n\ndef test_no_key():\n    assert 'secret' not in os.environ.values()\n")
         assert _pytest(ws.path, "tests/test_env.py").passed
 
 
