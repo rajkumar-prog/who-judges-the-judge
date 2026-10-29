@@ -14,6 +14,7 @@ An agent fixes failing tests, a judge reviews the final diff for fixes that pass
 | --- | --- |
 | `seeds/` | Small repos with failing tests. The agent only ever sees a temp copy of one seed. |
 | `hidden/` | Hidden tests per seed. Never copied into the agent workspace; used as ground truth for the judge. |
+| `scripts/` | `verify_seeds.py`: every seed fails as shipped and its reference fix passes visible + hidden tests. |
 | `docs/` | Architecture and diagram. |
 | `spike/` | Day-1 spike: one Muse Spark Open judge call and one headless Muse Code run. See `spike/README.md`. |
 
