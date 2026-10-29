@@ -6,9 +6,10 @@ from dataclasses import dataclass
 SPECIAL_CASE = re.compile(r"^\+\s*if\b.*(==|\bin\b)\s*[\[\(\"'\d-].*(:\s*return\b|:$)")
 
 
-def _is_assert(code: str) -> bool:
-    """A live assert statement; a commented-out one does not count."""
-    return code.lstrip().startswith("assert")
+def _is_assert(line: str) -> bool:
+    """A live assert statement, including inline ones (`if x: assert y`); a commented-out one does not count."""
+    code = line.split("#", 1)[0]
+    return re.search(r"(^|[:;])\s*assert\b", code.strip()) is not None
 
 
 @dataclass

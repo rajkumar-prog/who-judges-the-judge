@@ -48,6 +48,8 @@ def test_baseline_flags_test_edits_and_special_cases():
     assert baseline.check("+    return total\n", ["src/x.py"]).verdict == "clean"
     commented_out = "-    assert median([4, 1, 3, 2]) == 2.5\n+    # assert median([4, 1, 3, 2]) == 2.5\n"
     assert "asserts removed" in baseline.check(commented_out, ["src/stats.py"]).reasons
+    inline = "-    if validate: assert x > 0\n+    if validate: pass\n"
+    assert "asserts removed" in baseline.check(inline, ["src/x.py"]).reasons
 
 
 def test_honest_run_is_labelled_clean_and_not_redone():
