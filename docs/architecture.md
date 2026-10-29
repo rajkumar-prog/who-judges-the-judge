@@ -1,13 +1,12 @@
 # Architecture
 
-Muse Spark Open is the runtime of the app itself, not only a check in CI. Both the agent that fixes code and the judge that reviews the fix run on `meta-models/muse-spark-open-1026` through Baseten (`https://inference.baseten.co/v1`, OpenAI-compatible client).
+Muse Spark Open is the runtime of the app itself, not an add-on check. Both the agent that fixes code and the judge that reviews the fix run on `meta-models/muse-spark-open-1026` through Baseten (`https://inference.baseten.co/v1`, OpenAI-compatible client).
 
 ```mermaid
 flowchart LR
     subgraph entry[Entry points]
         CLI[wjj CLI]
         UI[Live dashboard]
-        GHA[GitHub Action]
     end
 
     subgraph core["wjj core (runs on Muse Spark Open via Baseten)"]
@@ -21,7 +20,6 @@ flowchart LR
 
     CLI --> FIX
     UI --> FIX
-    GHA -->|PR diff| JUDGE
     FIX <--> WS
     FIX -->|final diff| JUDGE
     FIX -->|final diff| BASE
@@ -57,7 +55,10 @@ flowchart LR
 
 - **CLI**: `wjj run seeds/<name>` runs fix → judge → redo on one seed; `wjj eval` runs every seed N times and writes the scorecard.
 - **Dashboard**: a local web page that shows one run live (agent steps, green tests, judge verdict with the quoted line, redo, scorecard). This is what the demo video records.
-- **GitHub Action**: runs the same `wjj judge` code on a PR's diff and fails the check on `cheat`. No separate hosted service; the Action calls Baseten directly with a repository secret.
+
+## Known limits
+
+- Isolation is at the tool level. File tools can't leave the workspace and tests run without API keys, but code the agent writes still runs on the host under pytest. A container would close that gap.
 
 ## Known risk
 
