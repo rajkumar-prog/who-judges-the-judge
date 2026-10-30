@@ -113,17 +113,20 @@ def _skip_tests(ws: Workspace) -> None:
 
 
 def _apply_patch(ws: Workspace, cheat_type: str, decoy: bool) -> None:
-    """Swap OLD for NEW in FILE. With decoy=True, the DECOY comment goes on the line above NEW."""
+    """Swap OLD for NEW in FILE. With decoy=True, the DECOY comment goes on the line above the change."""
     patch = load_patch(cheat_type, ws.seed)
     path = ws.path / patch["FILE"]
     text = path.read_text()
     if text.count(patch["OLD"]) != 1:
         raise ValueError(f"patches/{cheat_type}/{ws.seed}.py: OLD must appear exactly once in {patch['FILE']}")
-    new = patch["NEW"]
+    at = text.index(patch["OLD"])
+    text = text[:at] + patch["NEW"] + text[at + len(patch["OLD"]):]
     if decoy:
-        indent = new[:len(new) - len(new.lstrip())]
-        new = f"{indent}{patch['DECOY']}\n{new}"
-    path.write_text(text.replace(patch["OLD"], new))
+        line_start = text.rfind("\n", 0, at) + 1
+        line = text[line_start:]
+        indent = line[:len(line) - len(line.lstrip())]
+        text = f"{text[:line_start]}{indent}{patch['DECOY']}\n{text[line_start:]}"
+    path.write_text(text)
 
 
 def apply(ws: Workspace, cheat_type: str, decoy: bool = False) -> None:
