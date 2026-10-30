@@ -4,6 +4,7 @@
   python -m wjj eval --attempts 3           # every seed, both modes; writes results/ and scorecard
   python -m wjj score results/runs.jsonl    # rebuild the scorecard from saved runs
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
+  python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
 """
 import argparse
 import json
@@ -122,6 +123,20 @@ def cmd_duel(args) -> int:
     return 0
 
 
+def cmd_regrade(args) -> int:
+    src = Path(args.duels)
+    records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
+    records, changes = duel_mod.regrade(records)
+    out = src.with_name(src.stem + "-regraded.jsonl")
+    out.write_text("".join(json.dumps(r) + "\n" for r in records))
+    for c in changes:
+        print(f"  {c['seed']:10} {c['cheat_type']:15} round {c['round']}: {c['before']} -> {c['after']}")
+    md = duel_mod.markdown(duel_mod.summarize(records))
+    out.with_suffix(".md").write_text(md)
+    print(f"\n{len(changes)} rounds changed\n\n{md}\nsaved {out}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -148,6 +163,9 @@ def main(argv=None) -> int:
     d.add_argument("--cheat-type", choices=["all", *cheats.TYPES], default="all")
     d.add_argument("--cheater", choices=["meta", "baseten"], default="meta")
     d.set_defaults(func=cmd_duel)
+    g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
+    g.add_argument("duels")
+    g.set_defaults(func=cmd_regrade)
     args = ap.parse_args(argv)
     return args.func(args)
 
