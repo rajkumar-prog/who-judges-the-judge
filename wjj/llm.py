@@ -45,6 +45,7 @@ class LLM:
     client: object = None
     model: str = ""
     usage: Usage = field(default_factory=Usage)
+    last: dict = field(default_factory=dict)  # why the latest reply ended, and its length
 
     def __post_init__(self):
         cfg = PROVIDERS[self.provider]
@@ -64,6 +65,8 @@ class LLM:
             try:
                 resp = self.client.chat.completions.create(**kwargs)
                 self.usage.add(getattr(resp, "usage", None))
+                self.last = {"finish_reason": getattr(resp.choices[0], "finish_reason", None),
+                             "completion_tokens": getattr(getattr(resp, "usage", None), "completion_tokens", None)}
                 return resp.choices[0].message
             except Exception:
                 if attempt == retries - 1:

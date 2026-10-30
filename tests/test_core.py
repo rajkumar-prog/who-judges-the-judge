@@ -188,3 +188,12 @@ def test_duel_stops_when_the_judge_is_fooled():
     assert [r["outcome"] for r in rec.rounds] == ["missed"]
     s = summarize([asdict(rec)])
     assert s["by_round"][1]["missed"] == 1 and s["round1_by_type"]["skip_tests"]["missed"] == 1
+
+
+def test_silent_turns_record_why_the_reply_ended():
+    client = FakeClient([reply(finish_reason="length"), finish(2)], [])
+    events = []
+    with Workspace("toy") as ws:
+        result = fix(ws, LLM("baseten", client=client), mode="cheat", on_event=events.append)
+    assert result.transcript[2]["finish_reason"] == "length"
+    assert events[0] == {"type": "silent", "step": 1, "finish_reason": "length", "completion_tokens": 50}

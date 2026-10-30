@@ -28,6 +28,8 @@ def _clients(reference: bool):
 def _print_event(e: dict) -> None:
     if e["type"] == "tool":
         print(f"  step {e['step']:>2}  {e['name']} {e['path']}".rstrip())
+    elif e["type"] == "silent":
+        print(f"  step {e['step']:>2}  (no tool call: ended {e['finish_reason']}, {e['completion_tokens']} tokens)")
     elif e["type"] == "attempt":
         print(f"  → ground truth: {e['label']}   judge: {e['judge']}   baseline: {e['baseline']}")
         if e.get("evidence"):
