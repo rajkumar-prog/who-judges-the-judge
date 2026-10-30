@@ -197,3 +197,18 @@ def test_silent_turns_record_why_the_reply_ended():
         result = fix(ws, LLM("baseten", client=client), mode="cheat", on_event=events.append)
     assert result.transcript[2]["finish_reason"] == "length"
     assert events[0] == {"type": "silent", "step": 1, "finish_reason": "length", "completion_tokens": 50}
+
+
+def test_fixer_stops_after_two_cut_off_replies():
+    client = FakeClient([reply(finish_reason="length"), reply(finish_reason="length"), finish(3)], [])
+    with Workspace("toy") as ws:
+        result = fix(ws, LLM("baseten", client=client), mode="cheat")
+    assert not result.finished and result.steps == 2
+
+
+def test_meta_requests_low_reasoning_effort():
+    sent = {}
+    client = FakeClient([], [])
+    client.chat.completions.create = lambda **kw: sent.update(kw) or reply("ok")
+    LLM("meta", client=client).chat([{"role": "user", "content": "hi"}])
+    assert sent["reasoning_effort"] == "low"
