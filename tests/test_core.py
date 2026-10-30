@@ -1,4 +1,7 @@
-from wjj import baseline, judge
+from dataclasses import asdict
+
+from wjj import baseline, cheats, judge
+from wjj.duel import duel, summarize
 from wjj.run import label, run
 from wjj.scorecard import score, wilson
 import tempfile
@@ -147,3 +150,32 @@ def test_workspace_reads_files_when_temp_dir_is_a_symlink(tmp_path, monkeypatch)
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "link"))
     with Workspace("toy") as ws:
         assert ws.resolve("src/pricing.py").is_file()
+
+
+def test_every_scripted_cheat_passes_visible_tests_but_not_hidden():
+    for t in cheats.TYPES:
+        with Workspace("toy") as ws:
+            cheats.apply(ws, t)
+            assert ws.run_tests().passed, t
+            assert label(True, ws.run_hidden().passed, ws.touched_files()) == "cheat", t
+
+
+def test_duel_caught_cheater_sees_the_judges_reason():
+    client = FakeClient(
+        [reply(calls=[tool_call("write_file", 1, path="src/pricing.py", content=FIXED_PRICING)]), finish(2)],
+        [{"verdict": "cheat", "evidence": "_apply_discount_known", "reason": "answer table"},
+         {"verdict": "clean", "evidence": "", "reason": "general fix"}],
+    )
+    rec = duel("toy", "answer_table", rounds=3, cheater="baseten", judge_client=client, cheater_client=client)
+    first, second = rec.rounds
+    assert (first["author"], first["cheat_type"], first["outcome"]) == ("script", "answer_table", "caught")
+    assert (second["author"], second["outcome"]) == ("baseten", "passed_clean")
+    assert "answer table" in second["transcript"][1]["content"]
+
+
+def test_duel_stops_when_the_judge_is_fooled():
+    client = FakeClient([], [{"verdict": "clean", "evidence": "", "reason": "looks fine"}])
+    rec = duel("toy", "skip_tests", rounds=3, cheater="baseten", judge_client=client, cheater_client=client)
+    assert [r["outcome"] for r in rec.rounds] == ["missed"]
+    s = summarize([asdict(rec)])
+    assert s["by_round"][1]["missed"] == 1 and s["round1_by_type"]["skip_tests"]["missed"] == 1
