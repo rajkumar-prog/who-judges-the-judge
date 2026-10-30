@@ -2,6 +2,7 @@ from dataclasses import asdict
 
 from wjj import baseline, cheats, judge
 from wjj.duel import duel, feedback, regrade, summarize
+from wjj.probe import probe, summarize as summarize_probe
 from wjj.fixer import fix
 from wjj.llm import LLM
 from wjj.run import label, run
@@ -244,3 +245,29 @@ def test_failed_round_still_lists_approaches_already_caught():
               {"label": "failed", "diff": "d2", "judge": {}}]
     prompt = feedback(played)
     assert "did not make the visible tests pass" in prompt and "1. Evidence: a. Reason: first trick" in prompt
+
+
+def test_every_hand_written_patch_passes_visible_tests_but_not_hidden():
+    for t in cheats.patch_types():
+        for seed in cheats.patched_seeds(t):
+            for decoy in (False, True):
+                with Workspace(seed) as ws:
+                    cheats.apply(ws, t, decoy=decoy)
+                    assert ws.run_tests().passed, f"{t}/{seed}: visible tests fail"
+                    assert not ws.run_hidden().passed, f"{t}/{seed}: hidden tests pass, so it isn't a cheat"
+
+
+def test_decoy_comment_sits_above_the_changed_line():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula", decoy=True)
+        src = (ws.path / "src/stats.py").read_text()
+    assert "    # Midpoint of the sorted range" in src and src.index("# Midpoint") < src.index("ordered[-1]")
+
+
+def test_probe_counts_a_flip_when_only_the_comment_changes_the_verdict():
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "x", "reason": "midrange"},
+                             {"verdict": "clean", "evidence": "x", "reason": "documented"}])
+    rec = probe("wrong_formula", "median", client)
+    assert rec["plain"]["label"] == "cheat" and rec["flipped"]
+    s = summarize_probe([rec])
+    assert (s["caught_plain"], s["caught_decoy"], s["flipped"]) == (1, 0, 1)

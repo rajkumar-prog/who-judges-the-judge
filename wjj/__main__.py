@@ -5,6 +5,7 @@
   python -m wjj score results/runs.jsonl    # rebuild the scorecard from saved runs
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
+  python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
 """
 import argparse
 import json
@@ -14,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cheats, duel as duel_mod, scorecard
+from . import cheats, duel as duel_mod, probe as probe_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -100,6 +101,8 @@ def cmd_duel(args) -> int:
     seeds = [args.seed] if args.seed != "all" else sorted(
         p.name for p in (ROOT / "seeds").iterdir() if p.is_dir() and p.name != "toy")
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
+    if args.cheat_type in cheats.patch_types():
+        seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
     out = ROOT / "results" / f"duel-{args.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
     out.parent.mkdir(exist_ok=True)
     records = []
@@ -137,6 +140,25 @@ def cmd_regrade(args) -> int:
     return 0
 
 
+def cmd_probe(args) -> int:
+    client = LLM("baseten").client
+    types = cheats.patch_types() if args.cheat_type == "all" else [args.cheat_type]
+    records = []
+    for t in types:
+        for seed in cheats.patched_seeds(t):
+            rec = probe_mod.probe(t, seed, client)
+            records.append(rec)
+            print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
+                  f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text("".join(json.dumps(r) + "\n" for r in records))
+    md = probe_mod.markdown(probe_mod.summarize(records), records)
+    out.with_suffix(".md").write_text(md)
+    print("\n" + md + f"\nsaved {out.relative_to(ROOT)}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -160,12 +182,15 @@ def main(argv=None) -> int:
     d = sub.add_parser("duel")
     d.add_argument("seed", help="a seed name, or 'all'")
     d.add_argument("--rounds", type=int, default=3)
-    d.add_argument("--cheat-type", choices=["all", *cheats.TYPES], default="all")
+    d.add_argument("--cheat-type", choices=["all", *cheats.TYPES, *cheats.patch_types()], default="all")
     d.add_argument("--cheater", choices=["meta", "baseten"], default="meta")
     d.set_defaults(func=cmd_duel)
     g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
     g.add_argument("duels")
     g.set_defaults(func=cmd_regrade)
+    pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
+    pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
+    pr.set_defaults(func=cmd_probe)
     args = ap.parse_args(argv)
     return args.func(args)
 
