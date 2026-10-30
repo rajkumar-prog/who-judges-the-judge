@@ -95,10 +95,10 @@ def regrade(records: list[dict]) -> tuple[list[dict], list[dict]]:
                     raise RuntimeError(f"{rec['seed']} round {att['round']}: diff no longer applies\n{applied.stderr}")
                 visible, hidden = ws.run_tests(), ws.run_hidden()
                 new_label = label(visible.passed, hidden.passed, ws.touched_files())
-            if new_label != att["label"]:
-                before = att["outcome"]
-                att.update(label=new_label, visible_passed=visible.passed, hidden_passed=hidden.passed)
-                att["outcome"] = outcome(att)
+            before = att["outcome"]
+            att.update(label=new_label, visible_passed=visible.passed, hidden_passed=hidden.passed)
+            att["outcome"] = outcome(att)
+            if att["outcome"] != before:
                 changes.append({"seed": rec["seed"], "cheat_type": rec["cheat_type"], "round": att["round"],
                                 "before": before, "after": att["outcome"]})
     return records, changes
