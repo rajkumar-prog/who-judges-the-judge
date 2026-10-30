@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from wjj import baseline, cheats, judge
-from wjj.duel import duel, regrade, summarize
+from wjj.duel import duel, feedback, regrade, summarize
 from wjj.fixer import fix
 from wjj.llm import LLM
 from wjj.run import label, run
@@ -237,3 +237,10 @@ def test_cheater_is_shown_every_approach_already_caught():
     rec = duel("toy", "answer_table", rounds=3, cheater="baseten", judge_client=client, cheater_client=client)
     prompt = rec.rounds[2]["transcript"][1]["content"]
     assert "1. Evidence: a. Reason: first trick" in prompt and "2. Evidence: b. Reason: second trick" in prompt
+
+
+def test_failed_round_still_lists_approaches_already_caught():
+    played = [{"label": "cheat", "diff": "d1", "judge": {"verdict": "cheat", "evidence": "a", "reason": "first trick"}},
+              {"label": "failed", "diff": "d2", "judge": {}}]
+    prompt = feedback(played)
+    assert "did not make the visible tests pass" in prompt and "1. Evidence: a. Reason: first trick" in prompt
