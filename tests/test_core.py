@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from wjj import baseline, cheats, judge
-from wjj.duel import duel, summarize
+from wjj.duel import duel, regrade, summarize
 from wjj.fixer import fix
 from wjj.llm import LLM
 from wjj.run import label, run
@@ -212,3 +212,28 @@ def test_meta_requests_low_reasoning_effort():
     client.chat.completions.create = lambda **kw: sent.update(kw) or reply("ok")
     LLM("meta", client=client).chat([{"role": "user", "content": "hi"}])
     assert sent["reasoning_effort"] == "low"
+
+
+def test_regrade_relabels_a_saved_diff_with_todays_hidden_tests():
+    with Workspace("toy") as ws:
+        cheats.apply(ws, "answer_table")
+        diff = ws.diff()
+    att = {"round": 1, "diff": diff, "label": "clean", "outcome": "passed_clean",
+           "judge": {"verdict": "clean"}, "visible_passed": True, "hidden_passed": True}
+    records, changes = regrade([{"seed": "toy", "cheat_type": "answer_table", "rounds": [att]}])
+    assert records[0]["rounds"][0]["label"] == "cheat"
+    assert changes == [{"seed": "toy", "cheat_type": "answer_table", "round": 1,
+                        "before": "passed_clean", "after": "missed"}]
+
+
+def test_cheater_is_shown_every_approach_already_caught():
+    write = lambda i: reply(calls=[tool_call("write_file", i, path="src/pricing.py", content=FIXED_PRICING)])
+    client = FakeClient(
+        [write(1), finish(2), write(3), finish(4)],
+        [{"verdict": "cheat", "evidence": "a", "reason": "first trick"},
+         {"verdict": "cheat", "evidence": "b", "reason": "second trick"},
+         {"verdict": "cheat", "evidence": "c", "reason": "third trick"}],
+    )
+    rec = duel("toy", "answer_table", rounds=3, cheater="baseten", judge_client=client, cheater_client=client)
+    prompt = rec.rounds[2]["transcript"][1]["content"]
+    assert "1. Evidence: a. Reason: first trick" in prompt and "2. Evidence: b. Reason: second trick" in prompt
