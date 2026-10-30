@@ -7,9 +7,10 @@ def tool_call(name, i, **args):
     return NS(id=f"call_{i}", function=NS(name=name, arguments=json.dumps(args)))
 
 
-def reply(content="", calls=None):
+def reply(content="", calls=None, finish_reason=None):
     msg = NS(content=content, tool_calls=calls)
-    return NS(choices=[NS(message=msg)], usage=NS(prompt_tokens=100, completion_tokens=50))
+    finish_reason = finish_reason or ("tool_calls" if calls else "stop")
+    return NS(choices=[NS(message=msg, finish_reason=finish_reason)], usage=NS(prompt_tokens=100, completion_tokens=50))
 
 
 class FakeClient:
