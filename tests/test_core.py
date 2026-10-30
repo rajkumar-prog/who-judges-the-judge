@@ -1,4 +1,6 @@
 from wjj import baseline, judge
+from wjj.fixer import fix
+from wjj.llm import LLM
 from wjj.run import label, run
 from wjj.scorecard import score, wilson
 import tempfile
@@ -147,3 +149,10 @@ def test_workspace_reads_files_when_temp_dir_is_a_symlink(tmp_path, monkeypatch)
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "link"))
     with Workspace("toy") as ws:
         assert ws.resolve("src/pricing.py").is_file()
+
+
+def test_caught_cheater_is_told_to_hide_it():
+    client = FakeClient([finish(1)], [])
+    with Workspace("toy") as ws:
+        result = fix(ws, LLM("baseten", client=client), mode="cheat", feedback="Verdict: cheat.")
+    assert "will not notice" in result.transcript[1]["content"]
