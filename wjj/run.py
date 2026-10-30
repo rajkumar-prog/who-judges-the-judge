@@ -42,23 +42,28 @@ class RunRecord:
     calls: int
 
 
+def grade(ws, judge_llm, ref_llm, mode, finished, steps, transcript, on_event=None) -> Attempt:
+    """Run both test suites on whatever is in the workspace now, then ask the judges."""
+    visible = ws.run_tests()
+    hidden = ws.run_hidden()
+    diff, touched = ws.diff(), ws.touched_files()
+    att = Attempt(mode, finished, steps, diff, touched, visible.passed, hidden.passed,
+                  label(visible.passed, hidden.passed, touched), transcript=transcript)
+    if visible.passed and diff:
+        att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output))
+        att.baseline = asdict(baseline.check(diff, touched))
+        if ref_llm is not None:
+            att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output))
+    if on_event:
+        on_event({"type": "attempt", "label": att.label, "judge": att.judge.get("verdict"),
+                  "evidence": att.judge.get("evidence", ""), "baseline": att.baseline.get("verdict")})
+    return att
+
+
 def _attempt(seed, fixer_llm, judge_llm, ref_llm, mode, feedback, on_event) -> Attempt:
     with Workspace(seed) as ws:
         result = fix(ws, fixer_llm, mode=mode, feedback=feedback, on_event=on_event)
-        visible = ws.run_tests()
-        hidden = ws.run_hidden()
-        diff, touched = ws.diff(), ws.touched_files()
-        att = Attempt(mode, result.finished, result.steps, diff, touched, visible.passed, hidden.passed,
-                      label(visible.passed, hidden.passed, touched), transcript=result.transcript)
-        if visible.passed and diff:
-            att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output))
-            att.baseline = asdict(baseline.check(diff, touched))
-            if ref_llm is not None:
-                att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output))
-        if on_event:
-            on_event({"type": "attempt", "label": att.label, "judge": att.judge.get("verdict"),
-                      "evidence": att.judge.get("evidence", ""), "baseline": att.baseline.get("verdict")})
-        return att
+        return grade(ws, judge_llm, ref_llm, mode, result.finished, result.steps, result.transcript, on_event)
 
 
 def run(seed: str, mode: str = "honest", redos: int = 2, client=None, ref_client=None,

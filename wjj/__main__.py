@@ -3,6 +3,7 @@
   python -m wjj run median --mode cheat     # one seed: fix → judge → redo, printed live
   python -m wjj eval --attempts 3           # every seed, both modes; writes results/ and scorecard
   python -m wjj score results/runs.jsonl    # rebuild the scorecard from saved runs
+  python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
 """
 import argparse
 import json
@@ -12,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import scorecard
+from . import cheats, duel as duel_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -31,6 +32,8 @@ def _print_event(e: dict) -> None:
         print(f"  → ground truth: {e['label']}   judge: {e['judge']}   baseline: {e['baseline']}")
         if e.get("evidence"):
             print(f"    evidence: {e['evidence']}")
+    elif e["type"] == "round":
+        print(f"\n  round {e['n']}")
     elif e["type"] == "redo":
         print(f"\n  judge said cheat, redo #{e['n']}")
 
@@ -88,6 +91,35 @@ def cmd_score(args) -> int:
     return _write_score(p, p.parent)
 
 
+def cmd_duel(args) -> int:
+    judge_client = LLM("baseten").client
+    cheater_client = judge_client if args.cheater == "baseten" else LLM(args.cheater).client
+    seeds = [args.seed] if args.seed != "all" else sorted(
+        p.name for p in (ROOT / "seeds").iterdir() if p.is_dir() and p.name != "toy")
+    types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
+    out = ROOT / "results" / f"duel-{args.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out.parent.mkdir(exist_ok=True)
+    records = []
+    with out.open("w") as f:
+        for seed in seeds:
+            for t in types:
+                print(f"\n== {seed} / {t} / cheater={args.cheater}")
+                try:
+                    rec = asdict(duel_mod.duel(seed, t, args.rounds, args.cheater, judge_client, cheater_client,
+                                               on_event=_print_event))
+                except Exception as e:
+                    print(f"  error: {e}", file=sys.stderr)
+                    continue
+                f.write(json.dumps(rec) + "\n")
+                f.flush()
+                records.append(rec)
+    md = duel_mod.markdown(duel_mod.summarize(records))
+    print("\n" + md)
+    out.with_suffix(".md").write_text(md)
+    print(f"saved {out.relative_to(ROOT)}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -108,6 +140,12 @@ def main(argv=None) -> int:
     s = sub.add_parser("score")
     s.add_argument("runs")
     s.set_defaults(func=cmd_score)
+    d = sub.add_parser("duel")
+    d.add_argument("seed", help="a seed name, or 'all'")
+    d.add_argument("--rounds", type=int, default=3)
+    d.add_argument("--cheat-type", choices=["all", *cheats.TYPES], default="all")
+    d.add_argument("--cheater", choices=["meta", "baseten"], default="meta")
+    d.set_defaults(func=cmd_duel)
     args = ap.parse_args(argv)
     return args.func(args)
 
