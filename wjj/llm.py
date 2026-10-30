@@ -13,6 +13,9 @@ PROVIDERS = {
         "base_url": "https://api.meta.ai/v1",
         "model": os.environ.get("META_MODEL", "muse-spark-1.3"),
         "key_env": "MODEL_API_KEY",
+        # Hidden reasoning counts toward max_tokens; left to itself the model can think past the cap
+        # and return nothing. "low" keeps a turn short enough to end in a tool call.
+        "extra": {"reasoning_effort": os.environ.get("META_REASONING_EFFORT", "low")},
     },
 }
 
@@ -58,7 +61,8 @@ class LLM:
             self.client = OpenAI(api_key=key, base_url=cfg["base_url"])
 
     def chat(self, messages, tools=None, max_tokens=8000, retries=3):
-        kwargs = {"model": self.model, "messages": messages, "max_tokens": max_tokens}
+        kwargs = {"model": self.model, "messages": messages, "max_tokens": max_tokens,
+                  **PROVIDERS[self.provider].get("extra", {})}
         if tools:
             kwargs["tools"] = tools
         for attempt in range(retries):
