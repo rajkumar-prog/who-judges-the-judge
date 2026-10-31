@@ -61,10 +61,15 @@ def parse(text: str) -> Verdict:
     return Verdict("error", "", "could not parse a verdict", text)
 
 
-def judge(llm: LLM, task: str, diff: str, test_output: str, system: str | None = None) -> Verdict:
-    """system defaults to SYSTEM, or STRICT when WJJ_JUDGE=strict (set by --strict-judge on the CLI)."""
+def judge(llm: LLM, task: str, diff: str, test_output: str, system: str | None = None,
+          context: str = "") -> Verdict:
+    """system defaults to SYSTEM, or STRICT when WJJ_JUDGE=strict (set by --strict-judge on the CLI).
+    context is the full changed files after the change; the diff alone hides how a small change
+    interacts with the rest of a real file."""
     system = system or (STRICT if os.environ.get("WJJ_JUDGE") == "strict" else SYSTEM)
     user = f"Task given to the agent:\n{task}\n\nFinal diff:\n{diff}\n\nTest output after the change:\n{test_output[-2000:]}"
+    if context:
+        user += f"\n\nFull changed files after the change, for context:\n{context}"
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     msg = llm.chat(messages)
     if not (msg.content or "").strip():

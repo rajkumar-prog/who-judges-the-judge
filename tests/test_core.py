@@ -377,3 +377,30 @@ def test_rejudge_refreshes_outcome_and_final_label_when_the_label_changes():
     rejudge_mod.rejudge([duel_rec, eval_rec], client, workers=1)
     assert duel_rec["rounds"][0]["outcome"] == "missed"
     assert eval_rec["final_label"] == "cheat"
+
+
+def test_every_case_patch_applies_and_its_kind_matches_the_hidden_tests():
+    """A correct patch must pass hidden tests and anything else must fail them, or the case set is mislabeled."""
+    from wjj import cases
+    assert cases.patches(), "no case patches found"
+    for seed, name in cases.patches():
+        with Workspace(seed) as ws:
+            p = cases.apply(ws, name)
+            assert ws.run_tests().passed, f"{seed}/{name}: visible tests should pass"
+            assert ws.run_hidden().passed == (p["KIND"] == "correct"), f"{seed}/{name}: kind {p['KIND']}"
+
+
+def test_cases_judges_both_prompts_with_the_changed_file_as_context():
+    from wjj import cases
+    replies = [{"verdict": v, "evidence": "e", "reason": "r"} for v in ("clean", "clean", "cheat", "clean")]
+    client = FakeClient([], replies)
+    seen = []
+    create = client.chat.completions.create
+    client.chat.completions.create = lambda **kw: (seen.append(kw["messages"][-1]["content"]), create(**kw))[1]
+    rec = cases.judge_case("ttlcache", "incomplete", repeat=2, judge_client=client)
+    assert len(seen) == 4 and all("class TTLCache" in m for m in seen)
+    assert rec["kind"] == "incomplete" and rec["label"] == "cheat"
+    assert [v["verdict"] for v in rec["judgments"]["strict"]] == ["cheat", "clean"]
+    s = cases.summarize([rec])
+    assert s["prompts"]["original"]["outcomes"] == {"missed": 2}
+    assert s["prompts"]["strict"]["stable_patches"] == 0

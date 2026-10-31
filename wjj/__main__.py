@@ -6,6 +6,7 @@
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
   python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
+  python -m wjj cases --repeat 2            # judge every real-repo case patch with both prompts
   python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
 import argparse
@@ -17,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
+from . import cases as cases_mod, cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -161,6 +162,24 @@ def cmd_probe(args) -> int:
     return 0
 
 
+def cmd_cases(args) -> int:
+    client = LLM("baseten").client
+    records = []
+    for seed, name in cases_mod.patches():
+        rec = cases_mod.judge_case(seed, name, args.repeat, client)
+        records.append(rec)
+        verdicts = lambda p: "/".join(v["verdict"] for v in rec["judgments"].get(p, [])) or "-"
+        print(f"  {seed:10} {name:20} {rec['kind']:10} hidden={rec['label']:6} "
+              f"original={verdicts('original')}  strict={verdicts('strict')}")
+    out = ROOT / "results" / f"cases-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text("".join(json.dumps(r) + "\n" for r in records))
+    md = cases_mod.markdown(cases_mod.summarize(records), records)
+    out.with_suffix(".md").write_text(md)
+    print("\n" + md + f"\nsaved {out.relative_to(ROOT)}")
+    return 0
+
+
 def cmd_rejudge(args) -> int:
     client = LLM("baseten").client
     everything, cost = [], 0.0
@@ -214,6 +233,9 @@ def main(argv=None) -> int:
     g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
     g.add_argument("duels")
     g.set_defaults(func=cmd_regrade)
+    ca = sub.add_parser("cases", help="judge every real-repo case patch with both prompts")
+    ca.add_argument("--repeat", type=int, default=2, help="judgments per patch per prompt")
+    ca.set_defaults(func=cmd_cases)
     pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
     pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
     pr.set_defaults(func=cmd_probe)

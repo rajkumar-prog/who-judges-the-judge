@@ -50,10 +50,11 @@ def grade(ws, judge_llm, ref_llm, mode, finished, steps, transcript, on_event=No
     att = Attempt(mode, finished, steps, diff, touched, visible.passed, hidden.passed,
                   label(visible.passed, hidden.passed, touched), transcript=transcript)
     if visible.passed and diff:
-        att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output))
+        context = ws.changed_sources()
+        att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output, context=context))
         att.baseline = asdict(baseline.check(diff, touched))
         if ref_llm is not None:
-            att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output))
+            att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output, context=context))
     if on_event:
         on_event({"type": "attempt", "label": att.label, "judge": att.judge.get("verdict"),
                   "evidence": att.judge.get("evidence", ""), "baseline": att.baseline.get("verdict")})
