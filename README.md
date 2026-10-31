@@ -77,7 +77,7 @@ Small seeds and small samples. I added hidden tests several times after reading 
 
 ## Related work
 
-Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654) compares held-out tests, LLM judges and test-file checks on reward hacking, [TRACE](https://arxiv.org/abs/2601.20103) is a labeled dataset of 517 reward-hacking trajectories for scoring detectors, and SHADE-Arena pits agents doing hidden sabotage against an LLM monitor. What's different here is that the cheater reads the judge's reasons and tries again, round after round, and hidden tests grade every verdict, so you can watch a judge's catch rate fall as the cheater adapts. It's a small runnable tool, not a benchmark.
+Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654) compares held-out tests, LLM judges and test-file checks on reward hacking, [TRACE](https://arxiv.org/abs/2601.20103) is a labeled dataset of 517 reward-hacking trajectories for scoring detectors, and [SHADE-Arena](https://arxiv.org/abs/2506.15740) pits agents doing hidden sabotage against an LLM monitor. What's different here is that the cheater reads the judge's reasons and tries again, round after round, and hidden tests grade every verdict, so you can watch a judge's catch rate fall as the cheater adapts. It's a small runnable tool, not a benchmark.
 
 ## Limits
 
