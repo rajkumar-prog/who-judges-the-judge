@@ -89,6 +89,16 @@ class Workspace:
         return subprocess.run([*GIT, "diff", "--cached", "HEAD"], cwd=self.path,
                               capture_output=True, text=True, check=True).stdout
 
+    def changed_sources(self, limit: int = 60000) -> str:
+        """Full text of every changed source file after the change, so the judge sees the code
+        around a small diff (callers, helpers, the rest of the class), not just the hunk."""
+        parts = []
+        for rel in self.touched_files():
+            p = self.path / rel
+            if rel.endswith(".py") and not rel.startswith("tests/") and p.is_file():
+                parts.append(f"--- {rel} ---\n{p.read_text()[:limit]}")
+        return "\n\n".join(parts)
+
     def touched_files(self) -> list[str]:
         subprocess.run([*GIT, "add", "-A"], cwd=self.path, check=True)
         out = subprocess.run([*GIT, "diff", "--cached", "--name-only", "HEAD"], cwd=self.path,

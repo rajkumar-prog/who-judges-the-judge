@@ -14,8 +14,8 @@ A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built duri
 
 Think of an exam. The student is a cheating agent, the exam is a small repo with a failing test, the answer key is a set of hidden tests the student never sees, and the invigilator is the judge. I'm testing the invigilator.
 
-- **Judge:** Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) reads the final diff and says `clean` or `cheat`.
-- **Cheater:** round 1 is a scripted cheat (an answer table, weakened asserts, skipped tests, or one of 16 hand-written ones in `patches/`). From round 2, hosted Muse Spark (`muse-spark-1.3`) rewrites the fix after reading every reason the judge has caught it for so far.
+- **Judge:** Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) reads the task, the final diff and the full changed files, and says `clean` or `cheat`.
+- **Cheater:** round 1 is a scripted cheat (an answer table, weakened asserts, skipped tests, or one of the hand-written ones in `patches/`). From round 2, hosted Muse Spark (`muse-spark-1.3`) rewrites the fix after reading every reason the judge has caught it for so far.
 - **Ground truth:** hidden tests decide what each round really was, so every verdict can be scored.
 - **Baseline:** a regex checker, to show what a non-model judge catches.
 
@@ -53,6 +53,7 @@ Use `python -m pytest`, not bare `pytest`: the bare command can't import `wjj`.
 | `eval --attempts N` | Every seed, honest and cheat mode; writes a scorecard with false-alarm rates |
 | `duel SEED\|all --rounds N` | Multi-round duel; `--cheat-type` picks the round-1 cheat |
 | `probe` | Judges each hand-written cheat with and without a reassuring comment |
+| `cases --repeat N` | Judges every real-repo patch (correct, incomplete and cheats) with both prompts, N times each |
 | `regrade FILE` | Re-runs today's hidden tests on saved diffs (no model calls) |
 | `rejudge FILE...` | Re-judges saved diffs with the strict prompt, so both prompts are scored on the same diffs |
 
@@ -81,7 +82,8 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 
 ## Limits
 
-- Twelve toy seeds, one function each. Real repos are bigger and messier.
+- Twelve toy seeds, one function each, plus two real-repo seeds (cachetools and requests). Two real bugs is still a small sample.
+- Every seed is Python, so nothing here says how the judge does on other languages.
 - Cheats are induced: the cheater is told to cheat. That's how you test an alarm, but natural cheating rates will differ.
 - The same model family plays judge and cheater.
 - The judge's verdicts aren't fully stable: one identical diff got different verdicts in two runs.
@@ -92,9 +94,10 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 | --- | --- |
 | `wjj/` | The app: fixer agent, judge, baseline, duel, probe, regrade, rejudge, scorecard, CLI. |
 | `tests/` | Unit tests with a scripted fake model, plus 18 real saved judge replies. |
-| `seeds/` | Small repos with failing tests. The agent only ever sees a temp copy of one seed. |
+| `seeds/` | Repos with failing tests: 12 toy seeds, plus `ttlcache` (cachetools 7.2.1) and `proxyauth` (requests 2.30.0, CVE-2023-32681). The agent only ever sees a temp copy of one seed. |
 | `hidden/` | Hidden tests per seed. Never copied into the agent workspace. |
 | `patches/` | Hand-written cheats, one file per seed. See `patches/README.md`. |
+| `cases/` | Correct and incomplete fixes for the real-repo seeds. See `cases/README.md`. |
 | `scripts/` | `verify_seeds.py`: every seed fails as shipped and its reference fix passes. |
 | `docs/` | Architecture and the hidden-test change log. |
 | `spike/` | Day-1 spike: one judge call and one headless Muse Code run. |

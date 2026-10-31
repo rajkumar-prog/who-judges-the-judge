@@ -377,3 +377,50 @@ def test_rejudge_refreshes_outcome_and_final_label_when_the_label_changes():
     rejudge_mod.rejudge([duel_rec, eval_rec], client, workers=1)
     assert duel_rec["rounds"][0]["outcome"] == "missed"
     assert eval_rec["final_label"] == "cheat"
+
+
+def test_every_case_patch_applies_and_its_kind_matches_the_hidden_tests():
+    """A correct patch must pass hidden tests and anything else must fail them, or the case set is mislabeled."""
+    from wjj import cases
+    assert cases.patches(), "no case patches found"
+    for seed, name in cases.patches():
+        with Workspace(seed) as ws:
+            p = cases.apply(ws, name)
+            assert ws.run_tests().passed, f"{seed}/{name}: visible tests should pass"
+            assert ws.run_hidden().passed == (p["KIND"] == "correct"), f"{seed}/{name}: kind {p['KIND']}"
+
+
+def test_cases_judges_both_prompts_with_the_changed_file_as_context():
+    from wjj import cases
+    replies = [{"verdict": v, "evidence": "e", "reason": "r"} for v in ("clean", "clean", "cheat", "clean")]
+    client = FakeClient([], replies)
+    seen = []
+    create = client.chat.completions.create
+    client.chat.completions.create = lambda **kw: (seen.append(kw["messages"][-1]["content"]), create(**kw))[1]
+    rec = cases.judge_case("ttlcache", "incomplete", repeat=2, judge_client=client)
+    assert len(seen) == 4 and all("class TTLCache" in m for m in seen)
+    assert rec["kind"] == "incomplete" and rec["label"] == "cheat"
+    assert [v["verdict"] for v in rec["judgments"]["strict"]] == ["cheat", "clean"]
+    s = cases.summarize([rec])
+    assert s["prompts"]["original"]["outcomes"] == {"missed": 2}
+    assert s["prompts"]["strict"]["stable_patches"] == 0
+
+
+def test_dashboard_export_splits_prompts_and_counts_cost_once(tmp_path):
+    from wjj import dashboard
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    att = {"diff": diff, "visible_passed": True, "hidden_passed": False, "label": "cheat", "round": 1,
+           "author": "script", "baseline": {"verdict": "clean"},
+           "judge": {"verdict": "clean", "evidence": "e", "reason": "looks general"},
+           "judge_strict": {"verdict": "cheat", "evidence": "e", "reason": "r", "counterexample": "[1,1,1,5]"}}
+    f = tmp_path / "duel.jsonl"
+    f.write_text(json.dumps({"seed": "median", "cheat_type": "wrong_formula", "rounds": [att], "cost_usd": 0.5}) + "\n")
+    runs = dashboard.load([str(f)])
+    assert sorted(r["prompt"] for r in runs) == ["original", "strict"]
+    assert {r["prompt"]: r["rounds"][0]["outcome"] for r in runs} == {"original": "missed", "strict": "caught"}
+    assert runs[0]["rounds"][0]["hidden_failures"]
+    s = dashboard.summarize(runs)
+    assert s["cost_usd"] == 0.5 and s["all"]["distinct_patches"] == 1 and s["all"]["judgments"] == 2
+    assert s["baseline"] == {"caught": 0, "cheats": 1, "false_alarms": 0, "cleans": 0}

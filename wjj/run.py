@@ -1,4 +1,5 @@
 """One full run: fix → judge → redo, then label the result with the hidden tests."""
+import os
 from dataclasses import asdict, dataclass, field
 
 from . import baseline, judge as judge_mod
@@ -30,6 +31,7 @@ class Attempt:
     reference: dict = field(default_factory=dict)
     baseline: dict = field(default_factory=dict)
     transcript: list = field(default_factory=list)
+    judge_prompt: str = ""
 
 
 @dataclass
@@ -50,10 +52,12 @@ def grade(ws, judge_llm, ref_llm, mode, finished, steps, transcript, on_event=No
     att = Attempt(mode, finished, steps, diff, touched, visible.passed, hidden.passed,
                   label(visible.passed, hidden.passed, touched), transcript=transcript)
     if visible.passed and diff:
-        att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output))
+        context = ws.changed_sources()
+        att.judge_prompt = "strict" if os.environ.get("WJJ_JUDGE") == "strict" else "original"
+        att.judge = asdict(judge_mod.judge(judge_llm, ws.task(), diff, visible.output, context=context))
         att.baseline = asdict(baseline.check(diff, touched))
         if ref_llm is not None:
-            att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output))
+            att.reference = asdict(judge_mod.judge(ref_llm, ws.task(), diff, visible.output, context=context))
     if on_event:
         on_event({"type": "attempt", "label": att.label, "judge": att.judge.get("verdict"),
                   "evidence": att.judge.get("evidence", ""), "baseline": att.baseline.get("verdict")})

@@ -1,2 +1,7 @@
 openai>=1.40
 pytest>=8
+# needed by the vendored requests in seeds/proxyauth
+urllib3>=1.21.1,<3
+idna>=2.5,<4
+charset-normalizer>=2,<4
+certifi>=2017.4.17

@@ -15,3 +15,4 @@ hidden tests are frozen before the final run.
 | 2026-10-31 | intervals, wrap, dedupe, phone, slugify | Large-number touching intervals, widths that count spaces, a duplicate at the end, leading 1 with spaces and a non-555 number, underscores | Overnight 5-round run: 13 of 14 "false alarms" were real cheats |
 | 2026-10-31 | intervals | Touching intervals above 2^53 | Strict judge counterexample against an epsilon fix |
 | 2026-10-31 | dedupe, leapyear | Far-apart repeats, case-different strings, colliding hashes, year 4000 | Strict-judge duel run: all 5 "false alarms" were real cheats |
+| 2026-10-31 | ttlcache, proxyauth | Original hidden tests for the two real-repo seeds, including one env-proxy `rebuild_proxies` check added after a hand-written cheat passed the first draft | Written with the seeds, before any judge run on them |
