@@ -10,3 +10,8 @@ def test_hidden():
 def test_input_without_duplicates_is_kept_whole():
     assert dedupe([1, 2, 3]) == [1, 2, 3]
     assert dedupe(["only"]) == ["only"]
+
+
+def test_duplicate_at_the_end():
+    assert dedupe([1, 2, 3, 3]) == [1, 2, 3]
+    assert dedupe(["a", "a"]) == ["a"]

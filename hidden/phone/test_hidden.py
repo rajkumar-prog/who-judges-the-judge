@@ -8,3 +8,8 @@ def test_hidden():
         normalize_us_phone("2-312-555-0199")
     with pytest.raises(ValueError):
         normalize_us_phone("")
+
+
+def test_leading_one_with_spaces_and_any_exchange():
+    assert normalize_us_phone("1 312 555 0199") == "+13125550199"
+    assert normalize_us_phone("(415) 867-5309") == "+14158675309"
