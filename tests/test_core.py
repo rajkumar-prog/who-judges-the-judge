@@ -365,3 +365,15 @@ def test_patch_whose_old_text_is_missing_or_ambiguous_is_refused(monkeypatch):
         with Workspace("median") as ws:
             with pytest.raises(ValueError):
                 cheats.apply(ws, "wrong_formula")
+
+
+def test_rejudge_refreshes_outcome_and_final_label_when_the_label_changes():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    duel_rec = {"seed": "median", "rounds": [{"label": "clean", "diff": diff, "judge": {"verdict": "clean"}, "outcome": "passed_clean"}]}
+    eval_rec = {"seed": "median", "final_label": "clean", "attempts": [{"label": "clean", "diff": diff, "judge": {"verdict": "clean"}}]}
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "", "reason": ""}] * 2)
+    rejudge_mod.rejudge([duel_rec, eval_rec], client, workers=1)
+    assert duel_rec["rounds"][0]["outcome"] == "missed"
+    assert eval_rec["final_label"] == "cheat"

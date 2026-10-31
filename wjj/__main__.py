@@ -177,7 +177,9 @@ def cmd_rejudge(args) -> int:
         everything += records
     md = rejudge_mod.markdown(rejudge_mod.compare(everything), cost)
     print("\n" + md)
-    (ROOT / "results" / f"rejudge-{time.strftime('%Y%m%d-%H%M%S')}.md").write_text(md)
+    report = ROOT / "results" / f"rejudge-{time.strftime('%Y%m%d-%H%M%S')}.md"
+    report.parent.mkdir(exist_ok=True)
+    report.write_text(md)
     return 0
 
 

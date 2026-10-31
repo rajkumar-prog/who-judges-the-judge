@@ -30,6 +30,8 @@ def _one(rec: dict, att: dict, llm: LLM) -> None:
         visible, hidden = ws.run_tests(), ws.run_hidden()
         att.update(label=label(visible.passed, hidden.passed, ws.touched_files()),
                    visible_passed=visible.passed, hidden_passed=hidden.passed)
+        if "outcome" in att:
+            att["outcome"] = outcome(att)
         att["judge_strict"] = asdict(judge_mod.judge(llm, ws.task(), att["diff"], visible.output,
                                                      system=judge_mod.STRICT))
 
@@ -44,6 +46,9 @@ def rejudge(records: list[dict], client=None, workers: int = 4, on_done=None) ->
         for i, _ in enumerate(pool.map(lambda job: _one(*job, llm), jobs), 1):
             if on_done:
                 on_done(i, len(jobs))
+    for rec in records:
+        if rec.get("attempts"):
+            rec["final_label"] = rec["attempts"][-1]["label"]
     return llm.usage.cost("baseten")
 
 
