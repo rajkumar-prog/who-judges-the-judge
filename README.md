@@ -91,4 +91,4 @@ Small seeds and small samples; brackets are 95% Wilson intervals where shown. Hi
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
