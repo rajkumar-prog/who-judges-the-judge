@@ -7,6 +7,7 @@
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
   python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
   python -m wjj cases --repeat 2            # judge every real-repo case patch with both prompts
+  python -m wjj dashboard strict:results/duel-x.jsonl ...  # export results for the dashboard page
   python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
 import argparse
@@ -18,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cases as cases_mod, cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
+from . import cases as cases_mod, cheats, dashboard as dashboard_mod, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -180,6 +181,13 @@ def cmd_cases(args) -> int:
     return 0
 
 
+def cmd_dashboard(args) -> int:
+    out = dashboard_mod.export(args.files, failures=not args.fast)
+    s = json.loads(out.read_text())["summary"]["all"]
+    print(f"{s['distinct_patches']} distinct patches, {s['judgments']} judgments -> {out.relative_to(ROOT)} and data.js")
+    return 0
+
+
 def cmd_rejudge(args) -> int:
     client = LLM("baseten").client
     everything, cost = [], 0.0
@@ -233,6 +241,10 @@ def main(argv=None) -> int:
     g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
     g.add_argument("duels")
     g.set_defaults(func=cmd_regrade)
+    da = sub.add_parser("dashboard", help="export result files into dashboard/data.json for the page")
+    da.add_argument("files", nargs="+", help="result files; prefix with strict: or original: if the file doesn't record its prompt")
+    da.add_argument("--fast", action="store_true", help="skip re-running hidden tests to list failing test names")
+    da.set_defaults(func=cmd_dashboard)
     ca = sub.add_parser("cases", help="judge every real-repo case patch with both prompts")
     ca.add_argument("--repeat", type=int, default=2, help="judgments per patch per prompt")
     ca.set_defaults(func=cmd_cases)

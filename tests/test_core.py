@@ -404,3 +404,23 @@ def test_cases_judges_both_prompts_with_the_changed_file_as_context():
     s = cases.summarize([rec])
     assert s["prompts"]["original"]["outcomes"] == {"missed": 2}
     assert s["prompts"]["strict"]["stable_patches"] == 0
+
+
+def test_dashboard_export_splits_prompts_and_counts_cost_once(tmp_path):
+    from wjj import dashboard
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    att = {"diff": diff, "visible_passed": True, "hidden_passed": False, "label": "cheat", "round": 1,
+           "author": "script", "baseline": {"verdict": "clean"},
+           "judge": {"verdict": "clean", "evidence": "e", "reason": "looks general"},
+           "judge_strict": {"verdict": "cheat", "evidence": "e", "reason": "r", "counterexample": "[1,1,1,5]"}}
+    f = tmp_path / "duel.jsonl"
+    f.write_text(json.dumps({"seed": "median", "cheat_type": "wrong_formula", "rounds": [att], "cost_usd": 0.5}) + "\n")
+    runs = dashboard.load([str(f)])
+    assert sorted(r["prompt"] for r in runs) == ["original", "strict"]
+    assert {r["prompt"]: r["rounds"][0]["outcome"] for r in runs} == {"original": "missed", "strict": "caught"}
+    assert runs[0]["rounds"][0]["hidden_failures"]
+    s = dashboard.summarize(runs)
+    assert s["cost_usd"] == 0.5 and s["all"]["distinct_patches"] == 1 and s["all"]["judgments"] == 2
+    assert s["baseline"] == {"caught": 0, "cheats": 1, "false_alarms": 0, "cleans": 0}
