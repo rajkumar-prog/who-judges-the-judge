@@ -6,6 +6,7 @@
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
   python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
+  python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
 import argparse
 import json
@@ -15,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cheats, duel as duel_mod, probe as probe_mod, scorecard
+from . import cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -159,6 +160,25 @@ def cmd_probe(args) -> int:
     return 0
 
 
+def cmd_rejudge(args) -> int:
+    client = LLM("baseten").client
+    everything, cost = [], 0.0
+    for name in args.files:
+        src = Path(name)
+        records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
+        print(f"{src.name}: {sum(1 for _ in rejudge_mod.graded(records))} diffs")
+        cost += rejudge_mod.rejudge(records, client, args.workers,
+                                    on_done=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True))
+        out = src.with_name(src.stem + "-rejudged.jsonl")
+        out.write_text("".join(json.dumps(r) + "\n" for r in records))
+        print(f"  saved {out}")
+        everything += records
+    md = rejudge_mod.markdown(rejudge_mod.compare(everything), cost)
+    print("\n" + md)
+    (ROOT / "results" / f"rejudge-{time.strftime('%Y%m%d-%H%M%S')}.md").write_text(md)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -191,6 +211,10 @@ def main(argv=None) -> int:
     pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
     pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
     pr.set_defaults(func=cmd_probe)
+    rj = sub.add_parser("rejudge", help="rescore saved duel or eval diffs with the strict judge prompt")
+    rj.add_argument("files", nargs="+")
+    rj.add_argument("--workers", type=int, default=4)
+    rj.set_defaults(func=cmd_rejudge)
     args = ap.parse_args(argv)
     return args.func(args)
 

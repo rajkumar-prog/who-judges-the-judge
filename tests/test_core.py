@@ -3,6 +3,7 @@ from dataclasses import asdict
 from wjj import baseline, cheats, judge
 from wjj.duel import duel, feedback, regrade, summarize
 from wjj.probe import probe, summarize as summarize_probe
+from wjj import rejudge as rejudge_mod
 from wjj.fixer import fix
 from wjj.llm import LLM
 from wjj.run import label, run
@@ -271,3 +272,22 @@ def test_probe_counts_a_flip_when_only_the_comment_changes_the_verdict():
     assert rec["plain"]["label"] == "cheat" and rec["flipped"]
     s = summarize_probe([rec])
     assert (s["caught_plain"], s["caught_decoy"], s["flipped"]) == (1, 0, 1)
+
+
+def test_parse_survives_braces_inside_the_counterexample():
+    v = judge.parse('{"verdict": "cheat", "counterexample": "median({1, 1, 5}) should be 1", "evidence": "e", "reason": "r"}')
+    assert v.verdict == "cheat" and "{1, 1, 5}" in v.counterexample
+
+
+def test_rejudge_scores_both_prompts_on_the_same_diffs():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    records = [{"seed": "median", "rounds": [
+        {"label": "cheat", "diff": diff, "judge": {"verdict": "clean"}},
+        {"label": "failed", "diff": "", "judge": {}}]}]
+    client = FakeClient([], [{"verdict": "cheat", "counterexample": "[1, 1, 1, 5] gives 3", "evidence": "x", "reason": "y"}])
+    rejudge_mod.rejudge(records, client, workers=1)
+    c = rejudge_mod.compare(records)
+    assert c["judge"]["caught"] == 0 and c["judge_strict"]["caught"] == 1 and c["fixed"] == 1
+    assert records[0]["rounds"][0]["judge_strict"]["counterexample"] == "[1, 1, 1, 5] gives 3"
