@@ -6,3 +6,7 @@ def test_hidden():
     assert not is_leap_year(2100)
     assert not is_leap_year(1800)
     assert is_leap_year(1996)
+
+
+def test_no_four_thousand_year_exception():
+    assert is_leap_year(4000)
