@@ -8,7 +8,7 @@ The judge's blind spot: it passes code that *looks* general even when it's wrong
 
 If you're going to trust an AI judge, test it against a cheater that adapts, with hidden tests as the answer key.
 
-Built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. All code in this repository was written during the event.
+A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. All code in this repository was written during the event.
 
 ## How it works
 
