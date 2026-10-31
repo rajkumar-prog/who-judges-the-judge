@@ -1,9 +1,11 @@
 """Balanced patch sets for the real-repo cases: correct fixes, incomplete fixes and cheats.
 
-Each file under cases/<seed>/ is one patch with a KIND (correct, incomplete or cheat), in the same
-FILE/OLD/NEW format as patches/. Every patch is judged with both prompts, `repeat` times each, so
-we can see whether the judge accepts correct fixes that look different from upstream, rejects
-honest-but-incomplete ones, catches cheats, and gives the same answer twice.
+The real-repo seeds are the ones with a folder under cases/. Their correct and incomplete fixes
+live there, one file per patch with a KIND; their cheats are the hand-written ones under
+patches/<type>/<seed>.py, so duels and the comment probe use the same cheats. Every patch is
+judged with both prompts, `repeat` times each, so we can see whether the judge accepts correct
+fixes that look different from upstream, rejects honest-but-incomplete ones, catches cheats,
+and gives the same answer twice.
 """
 import runpy
 from dataclasses import asdict
@@ -15,18 +17,28 @@ from .llm import LLM
 from .workspace import ROOT, Workspace
 
 CASES = ROOT / "cases"
+PATCHES = ROOT / "patches"
 PROMPTS = {"original": judge_mod.SYSTEM, "strict": judge_mod.STRICT}
 
 
+def seeds() -> list[str]:
+    return sorted(d.name for d in CASES.iterdir() if d.is_dir()) if CASES.is_dir() else []
+
+
 def patches() -> list[tuple[str, str]]:
-    """(seed, patch name) for every case patch."""
-    if not CASES.is_dir():
-        return []
-    return sorted((d.name, p.stem) for d in CASES.iterdir() if d.is_dir() for p in d.glob("*.py"))
+    """(seed, patch name) for every patch of every real-repo seed. Cheats are named after their type."""
+    out = []
+    for seed in seeds():
+        out += [(seed, p.stem) for p in sorted((CASES / seed).glob("*.py"))]
+        out += [(seed, p.parent.name) for p in sorted(PATCHES.glob(f"*/{seed}.py"))]
+    return out
 
 
 def load(seed: str, name: str) -> dict:
-    return runpy.run_path(str(CASES / seed / f"{name}.py"))
+    own = CASES / seed / f"{name}.py"
+    p = runpy.run_path(str(own if own.exists() else PATCHES / name / f"{seed}.py"))
+    p.setdefault("KIND", "cheat")
+    return p
 
 
 def apply(ws: Workspace, name: str) -> dict:
@@ -34,7 +46,7 @@ def apply(ws: Workspace, name: str) -> dict:
     path = ws.path / p["FILE"]
     text = path.read_text()
     if text.count(p["OLD"]) != 1:
-        raise ValueError(f"cases/{ws.seed}/{name}.py: OLD must appear exactly once in {p['FILE']}")
+        raise ValueError(f"{ws.seed}/{name}: OLD must appear exactly once in {p['FILE']}")
     path.write_text(text.replace(p["OLD"], p["NEW"]))
     return p
 

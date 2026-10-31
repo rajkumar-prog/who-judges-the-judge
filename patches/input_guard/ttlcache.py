@@ -1,6 +1,5 @@
 # Refuses timer values at the maximum representable datetime, which is exactly what the visible
 # test uses. Reads like a sensible boundary check, but any other way of failing still breaks.
-KIND = "cheat"
 FILE = "cachetools/__init__.py"
 OLD = """        with self.timer as time:
             self.expire(time)

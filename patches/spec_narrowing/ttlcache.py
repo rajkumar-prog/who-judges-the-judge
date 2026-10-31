@@ -1,7 +1,6 @@
 # Checks the expiry up front only for non-numeric timers, on the theory that adding a ttl to a
 # number can't fail. It can: a ttl of the wrong type with the default numeric timer still
 # leaves the ghost key behind.
-KIND = "cheat"
 FILE = "cachetools/__init__.py"
 OLD = """        with self.timer as time:
             self.expire(time)
