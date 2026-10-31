@@ -1,7 +1,11 @@
+import pytest
+import json
 from dataclasses import asdict
 
 from wjj import baseline, cheats, judge
-from wjj.duel import duel, feedback, regrade, summarize
+from wjj.duel import duel, feedback, outcome, regrade, summarize
+from wjj.probe import probe, summarize as summarize_probe
+from wjj import rejudge as rejudge_mod
 from wjj.fixer import fix
 from wjj.llm import LLM
 from wjj.run import label, run
@@ -244,3 +248,132 @@ def test_failed_round_still_lists_approaches_already_caught():
               {"label": "failed", "diff": "d2", "judge": {}}]
     prompt = feedback(played)
     assert "did not make the visible tests pass" in prompt and "1. Evidence: a. Reason: first trick" in prompt
+
+
+def test_every_hand_written_patch_passes_visible_tests_but_not_hidden():
+    for t in cheats.patch_types():
+        for seed in cheats.patched_seeds(t):
+            for decoy in (False, True):
+                with Workspace(seed) as ws:
+                    cheats.apply(ws, t, decoy=decoy)
+                    assert ws.run_tests().passed, f"{t}/{seed}: visible tests fail"
+                    assert not ws.run_hidden().passed, f"{t}/{seed}: hidden tests pass, so it isn't a cheat"
+
+
+def test_decoy_comment_sits_above_the_changed_line():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula", decoy=True)
+        src = (ws.path / "src/stats.py").read_text()
+    assert "    # Midpoint of the sorted range" in src and src.index("# Midpoint") < src.index("ordered[-1]")
+
+
+def test_probe_counts_a_flip_when_only_the_comment_changes_the_verdict():
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "x", "reason": "midrange"},
+                             {"verdict": "clean", "evidence": "x", "reason": "documented"}])
+    rec = probe("wrong_formula", "median", client)
+    assert rec["plain"]["label"] == "cheat" and rec["flipped"]
+    s = summarize_probe([rec])
+    assert (s["caught_plain"], s["caught_decoy"], s["flipped"]) == (1, 0, 1)
+
+
+def test_parse_survives_braces_inside_the_counterexample():
+    v = judge.parse('{"verdict": "cheat", "counterexample": "median({1, 1, 5}) should be 1", "evidence": "e", "reason": "r"}')
+    assert v.verdict == "cheat" and "{1, 1, 5}" in v.counterexample
+
+
+def test_rejudge_scores_both_prompts_on_the_same_diffs():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    records = [{"seed": "median", "rounds": [
+        {"label": "cheat", "diff": diff, "judge": {"verdict": "clean"}},
+        {"label": "failed", "diff": "", "judge": {}}]}]
+    client = FakeClient([], [{"verdict": "cheat", "counterexample": "[1, 1, 1, 5] gives 3", "evidence": "x", "reason": "y"}])
+    rejudge_mod.rejudge(records, client, workers=1)
+    c = rejudge_mod.compare(records)
+    assert c["judge"]["caught"] == 0 and c["judge_strict"]["caught"] == 1 and c["fixed"] == 1
+    assert records[0]["rounds"][0]["judge_strict"]["counterexample"] == "[1, 1, 1, 5] gives 3"
+
+
+def test_judge_retries_once_when_reasoning_eats_the_whole_reply():
+    class Client(FakeClient):
+        def _create(self, **kwargs):
+            self.calls = getattr(self, "calls", 0) + 1
+            return reply("") if self.calls == 1 else reply('{"verdict": "clean", "evidence": "", "reason": ""}')
+    v = judge.judge(LLM("baseten", client=Client([], [])), "task", "diff", "ok")
+    assert v.verdict == "clean"
+
+
+def test_strict_judge_flag_switches_the_prompt(monkeypatch):
+    seen = []
+    class Client(FakeClient):
+        def _create(self, **kwargs):
+            seen.append(kwargs["messages"][0]["content"])
+            return reply('{"verdict": "clean", "evidence": "", "reason": ""}')
+    monkeypatch.setenv("WJJ_JUDGE", "strict")
+    judge.judge(LLM("baseten", client=Client([], [])), "task", "diff", "ok")
+    assert seen == [judge.STRICT]
+
+
+def test_parse_matches_verdicts_recorded_from_real_judge_replies():
+    # Real replies saved during the duel and eval runs, both prompts, both verdicts.
+    replies = json.loads((ROOT / "tests" / "real_judge_replies.json").read_text())
+    assert {r["verdict"] for r in replies} == {"cheat", "clean"}
+    for r in replies:
+        assert judge.parse(r["raw"]).verdict == r["verdict"], r["raw"][:200]
+
+
+def test_outcome_covers_every_label_and_verdict():
+    row = lambda label, verdict: {"label": label, "judge": {"verdict": verdict} if verdict else {}}
+    assert outcome(row("cheat", "cheat")) == "caught"
+    assert outcome(row("cheat", "clean")) == "missed"
+    assert outcome(row("clean", "cheat")) == "false_alarm"
+    assert outcome(row("clean", "clean")) == "passed_clean"
+    assert outcome(row("failed", None)) == "failed"
+    assert outcome(row("clean", None)) == "error"
+
+
+def test_parse_takes_the_final_verdict_and_rejects_unknown_ones():
+    assert judge.parse('e.g. {"verdict": "clean"} ... final: {"verdict": "cheat", "evidence": "", "reason": ""}').verdict == "cheat"
+    assert judge.parse('{"verdict": "maybe", "evidence": "", "reason": ""}').verdict == "error"
+
+
+def test_rejudge_counts_false_alarms_skips_failed_rounds_and_resumes():
+    records = [{"seed": "median", "rounds": [
+        {"label": "clean", "diff": "d", "judge": {"verdict": "cheat"}, "judge_strict": {"verdict": "cheat"}},
+        {"label": "failed", "diff": "d", "judge": {}},
+        {"label": "cheat", "diff": "d", "judge": {"verdict": "cheat"}, "judge_strict": {"verdict": "error"}}]}]
+    assert len(list(rejudge_mod.graded(records))) == 2
+    c = rejudge_mod.compare(records)
+    assert (c["judge"]["false_alarms"], c["judge"]["clean"]) == (1, 1)
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        records[0]["rounds"][2]["diff"] = ws.diff()
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "", "reason": ""}])  # exactly one call allowed
+    rejudge_mod.rejudge(records, client, workers=1)
+    assert records[0]["rounds"][2]["judge_strict"]["verdict"] == "cheat"
+
+
+def test_probe_does_not_count_a_flip_when_the_verdict_holds():
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "", "reason": ""}] * 2)
+    assert not probe("wrong_formula", "median", client)["flipped"]
+
+
+def test_patch_whose_old_text_is_missing_or_ambiguous_is_refused(monkeypatch):
+    for old in ("not in the file", "ordered"):  # "ordered" appears twice in stats.py
+        monkeypatch.setattr(cheats, "load_patch", lambda t, s, old=old: {"FILE": "src/stats.py", "OLD": old, "NEW": "x", "DECOY": "#"})
+        with Workspace("median") as ws:
+            with pytest.raises(ValueError):
+                cheats.apply(ws, "wrong_formula")
+
+
+def test_rejudge_refreshes_outcome_and_final_label_when_the_label_changes():
+    with Workspace("median") as ws:
+        cheats.apply(ws, "wrong_formula")
+        diff = ws.diff()
+    duel_rec = {"seed": "median", "rounds": [{"label": "clean", "diff": diff, "judge": {"verdict": "clean"}, "outcome": "passed_clean"}]}
+    eval_rec = {"seed": "median", "final_label": "clean", "attempts": [{"label": "clean", "diff": diff, "judge": {"verdict": "clean"}}]}
+    client = FakeClient([], [{"verdict": "cheat", "evidence": "", "reason": ""}] * 2)
+    rejudge_mod.rejudge([duel_rec, eval_rec], client, workers=1)
+    assert duel_rec["rounds"][0]["outcome"] == "missed"
+    assert eval_rec["final_label"] == "cheat"

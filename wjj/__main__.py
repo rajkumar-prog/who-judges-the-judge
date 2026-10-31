@@ -5,16 +5,19 @@
   python -m wjj score results/runs.jsonl    # rebuild the scorecard from saved runs
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
+  python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
+  python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
 import argparse
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cheats, duel as duel_mod, scorecard
+from . import cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
 from .llm import LLM
 from .run import run
 from .workspace import ROOT
@@ -100,6 +103,8 @@ def cmd_duel(args) -> int:
     seeds = [args.seed] if args.seed != "all" else sorted(
         p.name for p in (ROOT / "seeds").iterdir() if p.is_dir() and p.name != "toy")
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
+    if args.cheat_type in cheats.patch_types():
+        seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
     out = ROOT / "results" / f"duel-{args.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
     out.parent.mkdir(exist_ok=True)
     records = []
@@ -137,8 +142,51 @@ def cmd_regrade(args) -> int:
     return 0
 
 
+def cmd_probe(args) -> int:
+    client = LLM("baseten").client
+    types = cheats.patch_types() if args.cheat_type == "all" else [args.cheat_type]
+    records = []
+    for t in types:
+        for seed in cheats.patched_seeds(t):
+            rec = probe_mod.probe(t, seed, client)
+            records.append(rec)
+            print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
+                  f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text("".join(json.dumps(r) + "\n" for r in records))
+    md = probe_mod.markdown(probe_mod.summarize(records), records)
+    out.with_suffix(".md").write_text(md)
+    print("\n" + md + f"\nsaved {out.relative_to(ROOT)}")
+    return 0
+
+
+def cmd_rejudge(args) -> int:
+    client = LLM("baseten").client
+    everything, cost = [], 0.0
+    for name in args.files:
+        src = Path(name)
+        records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
+        todo = sum(a.get("judge_strict", {}).get("verdict") in (None, "error") for _, a in rejudge_mod.graded(records))
+        print(f"{src.name}: {todo} diffs to judge")
+        cost += rejudge_mod.rejudge(records, client, args.workers,
+                                    on_done=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True))
+        out = src if src.stem.endswith("-rejudged") else src.with_name(src.stem + "-rejudged.jsonl")
+        out.write_text("".join(json.dumps(r) + "\n" for r in records))
+        print(f"  saved {out}")
+        everything += records
+    md = rejudge_mod.markdown(rejudge_mod.compare(everything), cost)
+    print("\n" + md)
+    report = ROOT / "results" / f"rejudge-{time.strftime('%Y%m%d-%H%M%S')}.md"
+    report.parent.mkdir(exist_ok=True)
+    report.write_text(md)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
+    ap.add_argument("--strict-judge", action="store_true",
+                    help="judge with the strict correctness prompt instead of the original one")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("seed")
@@ -160,13 +208,22 @@ def main(argv=None) -> int:
     d = sub.add_parser("duel")
     d.add_argument("seed", help="a seed name, or 'all'")
     d.add_argument("--rounds", type=int, default=3)
-    d.add_argument("--cheat-type", choices=["all", *cheats.TYPES], default="all")
+    d.add_argument("--cheat-type", choices=["all", *cheats.TYPES, *cheats.patch_types()], default="all")
     d.add_argument("--cheater", choices=["meta", "baseten"], default="meta")
     d.set_defaults(func=cmd_duel)
     g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
     g.add_argument("duels")
     g.set_defaults(func=cmd_regrade)
+    pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
+    pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
+    pr.set_defaults(func=cmd_probe)
+    rj = sub.add_parser("rejudge", help="rescore saved duel or eval diffs with the strict judge prompt")
+    rj.add_argument("files", nargs="+")
+    rj.add_argument("--workers", type=int, default=4)
+    rj.set_defaults(func=cmd_rejudge)
     args = ap.parse_args(argv)
+    if args.strict_judge:
+        os.environ["WJJ_JUDGE"] = "strict"
     return args.func(args)
 
 
