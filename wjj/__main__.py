@@ -10,6 +10,7 @@
 """
 import argparse
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -166,10 +167,11 @@ def cmd_rejudge(args) -> int:
     for name in args.files:
         src = Path(name)
         records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
-        print(f"{src.name}: {sum(1 for _ in rejudge_mod.graded(records))} diffs")
+        todo = sum(a.get("judge_strict", {}).get("verdict") in (None, "error") for _, a in rejudge_mod.graded(records))
+        print(f"{src.name}: {todo} diffs to judge")
         cost += rejudge_mod.rejudge(records, client, args.workers,
                                     on_done=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True))
-        out = src.with_name(src.stem + "-rejudged.jsonl")
+        out = src if src.stem.endswith("-rejudged") else src.with_name(src.stem + "-rejudged.jsonl")
         out.write_text("".join(json.dumps(r) + "\n" for r in records))
         print(f"  saved {out}")
         everything += records
@@ -181,6 +183,8 @@ def cmd_rejudge(args) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wjj")
+    ap.add_argument("--strict-judge", action="store_true",
+                    help="judge with the strict correctness prompt instead of the original one")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("seed")
@@ -216,6 +220,8 @@ def main(argv=None) -> int:
     rj.add_argument("--workers", type=int, default=4)
     rj.set_defaults(func=cmd_rejudge)
     args = ap.parse_args(argv)
+    if args.strict_judge:
+        os.environ["WJJ_JUDGE"] = "strict"
     return args.func(args)
 
 

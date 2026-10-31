@@ -15,3 +15,4 @@ def test_several_touching_groups():
 def test_touching_works_for_large_numbers():
     big = 10 ** 6
     assert merge_intervals([(big, big + 5), (big + 5, big + 9)]) == [(big, big + 9)]
+    assert merge_intervals([(0, 10 ** 16), (10 ** 16, 10 ** 16 + 1)]) == [(0, 10 ** 16 + 1)]

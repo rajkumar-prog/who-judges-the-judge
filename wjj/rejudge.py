@@ -35,8 +35,11 @@ def _one(rec: dict, att: dict, llm: LLM) -> None:
 
 
 def rejudge(records: list[dict], client=None, workers: int = 4, on_done=None) -> float:
+    """Skips attempts that already have a strict verdict, so a rejudged file can be run again
+    to fill in only the ones that came back unparseable."""
     llm = LLM("baseten", client=client)
-    jobs = list(graded(records))
+    jobs = [(rec, att) for rec, att in graded(records)
+            if att.get("judge_strict", {}).get("verdict") in (None, "error")]
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for i, _ in enumerate(pool.map(lambda job: _one(*job, llm), jobs), 1):
             if on_done:

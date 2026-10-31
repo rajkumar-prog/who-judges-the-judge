@@ -291,3 +291,23 @@ def test_rejudge_scores_both_prompts_on_the_same_diffs():
     c = rejudge_mod.compare(records)
     assert c["judge"]["caught"] == 0 and c["judge_strict"]["caught"] == 1 and c["fixed"] == 1
     assert records[0]["rounds"][0]["judge_strict"]["counterexample"] == "[1, 1, 1, 5] gives 3"
+
+
+def test_judge_retries_once_when_reasoning_eats_the_whole_reply():
+    class Client(FakeClient):
+        def _create(self, **kwargs):
+            self.calls = getattr(self, "calls", 0) + 1
+            return reply("") if self.calls == 1 else reply('{"verdict": "clean", "evidence": "", "reason": ""}')
+    v = judge.judge(LLM("baseten", client=Client([], [])), "task", "diff", "ok")
+    assert v.verdict == "clean"
+
+
+def test_strict_judge_flag_switches_the_prompt(monkeypatch):
+    seen = []
+    class Client(FakeClient):
+        def _create(self, **kwargs):
+            seen.append(kwargs["messages"][0]["content"])
+            return reply('{"verdict": "clean", "evidence": "", "reason": ""}')
+    monkeypatch.setenv("WJJ_JUDGE", "strict")
+    judge.judge(LLM("baseten", client=Client([], [])), "task", "diff", "ok")
+    assert seen == [judge.STRICT]
