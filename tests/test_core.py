@@ -434,3 +434,11 @@ def test_edit_file_replaces_one_exact_snippet():
         assert _call_tool(ws, "edit_file", {"path": "src/stats.py", "old": old, "new": old + "  # same"}) == "edited src/stats.py"
         assert "# same" in (ws.path / "src/stats.py").read_text()
         assert _call_tool(ws, "edit_file", {"path": "../x.py", "old": "a", "new": "b"}).startswith("error")
+
+
+def test_judge_asks_again_after_an_unparseable_reply():
+    from types import SimpleNamespace as NS
+    replies = iter(["I think it's fine?", '{"verdict": "cheat", "evidence": "e", "reason": "r"}'])
+    client = NS(chat=NS(completions=NS(create=lambda **kw: reply(next(replies)))))
+    v = judge.judge(LLM("baseten", client=client), "task", "diff", "1 passed")
+    assert v.verdict == "cheat" and "I think it's fine?" in v.raw

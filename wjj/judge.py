@@ -75,4 +75,10 @@ def judge(llm: LLM, task: str, diff: str, test_output: str, system: str | None =
     if not (msg.content or "").strip():
         # Hidden reasoning used up the whole token budget; give it one more go with twice the room.
         msg = llm.chat(messages, max_tokens=16000)
-    return parse(msg.content)
+    v = parse(msg.content)
+    if v.verdict == "error":
+        # A reply we can't read isn't a verdict. Ask once more; the first raw reply is kept for the record.
+        retry = parse(llm.chat(messages, max_tokens=16000).content)
+        retry.raw = f"{v.raw}\n--- retry after unparseable reply ---\n{retry.raw}"
+        v = retry
+    return v
