@@ -42,14 +42,20 @@ def _failures(seed: str, diff: str, cache: dict) -> list[str]:
     return cache[key]
 
 
-def _round(att: dict, n: int, judge_key: str, played: list, fails) -> dict:
+def _confirm(c: dict | None) -> dict | None:
+    """The judge's own failing test for a cheat verdict, if `wjj confirm` was run on this file."""
+    return {"status": c["status"], "test": c["test"]} if c else None
+
+
+def _round(att: dict, n: int, judge_key: str, played: list, fails, confirm: dict | None = None) -> dict:
     return {"n": n, "author": att.get("author", "agent"), "diff": att["diff"],
             "visible_passed": att["visible_passed"], "hidden_passed": att["hidden_passed"],
             "label": att["label"], "hidden_failures": fails(att) if att["label"] != "failed" and att["diff"] else [],
             "judge": _verdict(att.get(judge_key)),
             "outcome": outcome(att, judge_key) if att.get(judge_key) else "failed",
             "baseline": (att.get("baseline") or {}).get("verdict", ""),
-            "feedback_after": feedback(played) if att.get(judge_key, {}).get("verdict") == "cheat" else ""}
+            "feedback_after": feedback(played) if att.get(judge_key, {}).get("verdict") == "cheat" else "",
+            "confirm": _confirm(confirm)}
 
 
 def _prompts(att: dict, tag: str) -> list[tuple[str, str]]:
@@ -76,7 +82,8 @@ def load(specs: list[str], failures: bool = True) -> list[dict]:
                         att = {**rec, "judge": v, "author": "hand-written"}
                         runs.append({**base, "id": f"{path.stem}-{i}-{prompt}-{k}", "kind": "case", "prompt": prompt,
                                      "patch": rec["patch"], "patch_kind": rec["kind"], "cheat_type": "",
-                                     "rounds": [_round(att, 1, "judge", [], fails)]})
+                                     "rounds": [_round(att, 1, "judge", [], fails,
+                                                          (rec.get("confirm", {}).get(prompt) or [None] * (k + 1))[k])]})
                 continue
             attempts = rec.get("rounds") or rec.get("attempts") or []
             if not attempts:
@@ -85,7 +92,8 @@ def load(specs: list[str], failures: bool = True) -> list[dict]:
                 played, rounds = [], []
                 for n, att in enumerate(attempts, 1):
                     played.append({**att, "judge": att.get(key, {})})
-                    rounds.append(_round(att, att.get("round", n), key, played, fails))
+                    ckey = "confirm_strict" if key == "judge_strict" else "confirm"
+                    rounds.append(_round(att, att.get("round", n), key, played, fails, att.get(ckey)))
                 runs.append({**base, "id": f"{path.stem}-{i}-{prompt}", "kind": "duel" if "rounds" in rec else "eval",
                              "prompt": prompt, "patch": "", "patch_kind": "",
                              "cheat_type": rec.get("cheat_type") or rec.get("mode", ""), "rounds": rounds})

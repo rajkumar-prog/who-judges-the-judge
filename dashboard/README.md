@@ -34,6 +34,13 @@ runs[]
     hidden_failures [test names]
     baseline (cheat|clean|"")
     feedback_after   text the cheater was shown before the next round ("" if none)
+    confirm {status, test} or null   <- the judge's own failing test, run for real
+             status: confirmed (fails on patch, passes on the upstream fix) |
+                     test_wrong | not_reproduced | error
 ```
+
+`confirm` is only filled when the result file went through `python -m wjj confirm` first
+(pass the `-confirmed.jsonl` file to `dashboard`). A good place for it is under the judge's
+verdict: "Judge wrote this test → fails on the patch, passes on the real fix".
 
 `label` and `hidden_failures` are ground truth; `judge` is a prediction. Keep them visually apart.

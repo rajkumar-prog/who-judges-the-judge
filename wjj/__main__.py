@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cases as cases_mod, cheats, dashboard as dashboard_mod, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
+from . import cases as cases_mod, cheats, confirm as confirm_mod, dashboard as dashboard_mod, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
 from .llm import LLM, BudgetExceeded
 from .run import run
 from .workspace import ROOT
@@ -223,6 +223,27 @@ def cmd_rejudge(args) -> int:
     return 0
 
 
+def cmd_confirm(args) -> int:
+    client = LLM("baseten").client
+    for name in args.files:
+        src = Path(name)
+        records = confirm_mod.load(src)
+        out = src.with_name(src.stem + "-confirmed.jsonl")
+        print(f"{src.name}: {sum(1 for _ in confirm_mod.jobs(records))} cheat verdicts to confirm")
+        records = confirm_mod.load(src)
+        try:
+            cost = confirm_mod.confirm(records, client, args.workers,
+                                       on_done=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True))
+        except BudgetExceeded as e:
+            print(f"\n{e}; saving what finished", file=sys.stderr)
+            cost = None
+        out.write_text("".join(json.dumps(r) + "\n" for r in records))
+        md = confirm_mod.markdown(confirm_mod.summarize(records))
+        out.with_suffix(".md").write_text(md)
+        print(f"\n{md}" + (f"cost ${cost:.2f}, " if cost is not None else "") + f"saved {out}")
+    return 0
+
+
 def load_env(path: Path = ROOT / ".env") -> None:
     """Read KEY=VALUE lines from .env into the environment, without overriding anything already set."""
     if not path.is_file():
@@ -279,6 +300,10 @@ def main(argv=None) -> int:
     pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
     pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
     pr.set_defaults(func=cmd_probe)
+    cf = sub.add_parser("confirm", help="have the judge write a failing test for each saved cheat verdict, then run it")
+    cf.add_argument("files", nargs="+")
+    cf.add_argument("--workers", type=int, default=4)
+    cf.set_defaults(func=cmd_confirm)
     rj = sub.add_parser("rejudge", help="rescore saved duel or eval diffs with the strict judge prompt")
     rj.add_argument("files", nargs="+")
     rj.add_argument("--workers", type=int, default=4)

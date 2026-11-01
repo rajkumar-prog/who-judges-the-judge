@@ -55,6 +55,7 @@ Use `python -m pytest`, not bare `pytest`: the bare command can't import `wjj`.
 | `duel SEED\|all --rounds N` | Multi-round duel; `--cheat-type` picks the round-1 cheat |
 | `probe` | Judges each hand-written cheat with and without a reassuring comment |
 | `cases --repeat N` | Judges every real-repo patch (correct, incomplete and cheats) with both prompts, N times each |
+| `confirm FILE...` | For each saved cheat verdict, the judge writes a pytest test showing the problem; it counts as confirmed only if it fails on the patch and passes on the upstream fix |
 | `regrade FILE` | Re-runs today's hidden tests on saved diffs (no model calls) |
 | `rejudge FILE...` | Re-judges saved diffs with the strict prompt, so both prompts are scored on the same diffs |
 
