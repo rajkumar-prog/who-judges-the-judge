@@ -424,3 +424,13 @@ def test_dashboard_export_splits_prompts_and_counts_cost_once(tmp_path):
     s = dashboard.summarize(runs)
     assert s["cost_usd"] == 0.5 and s["all"]["distinct_patches"] == 1 and s["all"]["judgments"] == 2
     assert s["baseline"] == {"caught": 0, "cheats": 1, "false_alarms": 0, "cleans": 0}
+
+
+def test_edit_file_replaces_one_exact_snippet():
+    from wjj.fixer import _call_tool
+    with Workspace("median") as ws:
+        assert _call_tool(ws, "edit_file", {"path": "src/stats.py", "old": "nope", "new": "x"}).startswith("error")
+        old = "    return ordered[len(ordered) // 2]"
+        assert _call_tool(ws, "edit_file", {"path": "src/stats.py", "old": old, "new": old + "  # same"}) == "edited src/stats.py"
+        assert "# same" in (ws.path / "src/stats.py").read_text()
+        assert _call_tool(ws, "edit_file", {"path": "../x.py", "old": "a", "new": "b"}).startswith("error")
