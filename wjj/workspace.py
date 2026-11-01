@@ -26,11 +26,11 @@ NOT_REAL_PASS = re.compile(r"\b\d+ (skipped|xfailed|xpassed|deselected)\b|no tes
 SAFE_ENV = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")
 
 
-def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False) -> TestResult:
+def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False, args: tuple = ()) -> TestResult:
     env = {k: os.environ[k] for k in SAFE_ENV if k in os.environ}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
-        r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", target],
+        r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args, target],
                            cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
         output = (r.stdout + r.stderr)[-4000:]
         passed = r.returncode == 0 and not (strict and NOT_REAL_PASS.search(output))
@@ -88,6 +88,16 @@ class Workspace:
         subprocess.run([*GIT, "add", "-A"], cwd=self.path, check=True)
         return subprocess.run([*GIT, "diff", "--cached", "HEAD"], cwd=self.path,
                               capture_output=True, text=True, check=True).stdout
+
+    def changed_sources(self, limit: int = 60000) -> str:
+        """Full text of every changed source file after the change, so the judge sees the code
+        around a small diff (callers, helpers, the rest of the class), not just the hunk."""
+        parts = []
+        for rel in self.touched_files():
+            p = self.path / rel
+            if rel.endswith(".py") and not rel.startswith("tests/") and p.is_file():
+                parts.append(f"--- {rel} ---\n{p.read_text()[:limit]}")
+        return "\n\n".join(parts)
 
     def touched_files(self) -> list[str]:
         subprocess.run([*GIT, "add", "-A"], cwd=self.path, check=True)

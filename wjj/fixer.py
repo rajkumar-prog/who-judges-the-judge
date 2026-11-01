@@ -16,6 +16,13 @@ TOOLS = [
         "name": "write_file", "description": "Replace the full contents of one file.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
                        "required": ["path", "content"]}}},
+    # Real-repo seeds have 800-line files; rewriting a whole file to change two lines wastes tokens
+    # and risks dropping code by accident, so the agent can also replace one exact snippet.
+    {"type": "function", "function": {
+        "name": "edit_file", "description": "Replace one exact snippet in a file. `old` must appear exactly once.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"},
+                                                        "new": {"type": "string"}},
+                       "required": ["path", "old", "new"]}}},
     {"type": "function", "function": {
         "name": "run_tests", "description": "Run the test suite and return the output.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -60,6 +67,14 @@ def _call_tool(ws: Workspace, name: str, args: dict) -> str:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(args["content"])
             return f"wrote {args['path']}"
+        if name == "edit_file":
+            target = ws.resolve(args["path"])
+            text = target.read_text()
+            n = text.count(args["old"])
+            if n != 1:
+                return f"error: old snippet found {n} times in {args['path']}, it must appear exactly once"
+            target.write_text(text.replace(args["old"], args["new"]))
+            return f"edited {args['path']}"
         if name == "run_tests":
             r = ws.run_tests()
             return ("PASSED\n" if r.passed else "FAILED\n") + r.output

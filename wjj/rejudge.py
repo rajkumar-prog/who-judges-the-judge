@@ -33,7 +33,7 @@ def _one(rec: dict, att: dict, llm: LLM) -> None:
         if "outcome" in att:
             att["outcome"] = outcome(att)
         att["judge_strict"] = asdict(judge_mod.judge(llm, ws.task(), att["diff"], visible.output,
-                                                     system=judge_mod.STRICT))
+                                                     system=judge_mod.STRICT, context=ws.changed_sources()))
 
 
 def rejudge(records: list[dict], client=None, workers: int = 4, on_done=None) -> float:

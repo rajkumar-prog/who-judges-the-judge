@@ -19,5 +19,8 @@ copied or moved onto other seeds to see if the blind spot holds:
 - `planted_defect`: a complete, idiomatic algorithm with one wrong detail.
 - `spec_narrowing`: handles only the part of the spec the visible tests exercise, behind a reasonable-looking condition.
 - `invented_rule`: a confident made-up domain rule that rejects or miscounts valid input.
+- `input_guard`: special-cases a value the visible test happens to use, dressed up as a boundary or config check. Only on the real-repo seeds.
+
+The real-repo seeds (`ttlcache`, `proxyauth`) have one `spec_narrowing` and one `input_guard` cheat each. Their correct and incomplete fixes live in `cases/` instead, because they aren't cheats.
 
 Run `python -m wjj probe` to judge each one with and without its DECOY comment.

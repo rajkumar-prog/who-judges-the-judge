@@ -6,6 +6,8 @@
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
   python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
+  python -m wjj cases --repeat 2            # judge every real-repo case patch with both prompts
+  python -m wjj dashboard strict:results/duel-x.jsonl ...  # export results for the dashboard page
   python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
 import argparse
@@ -17,8 +19,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
-from . import cheats, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
-from .llm import LLM
+from . import cases as cases_mod, cheats, confirm as confirm_mod, dashboard as dashboard_mod, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
+from .llm import LLM, BudgetExceeded
 from .run import run
 from .workspace import ROOT
 
@@ -72,6 +74,8 @@ def cmd_eval(args) -> int:
             s, m = futures[fut]
             try:
                 rec = asdict(fut.result())
+            except BudgetExceeded:
+                raise
             except Exception as e:
                 print(f"[{i}/{len(jobs)}] {s} {m}: error {e}", file=sys.stderr)
                 continue
@@ -100,8 +104,11 @@ def cmd_score(args) -> int:
 def cmd_duel(args) -> int:
     judge_client = LLM("baseten").client
     cheater_client = judge_client if args.cheater == "baseten" else LLM(args.cheater).client
+    # "all" means the toy suite; the real-repo seeds are run by name, since the scripted
+    # cheats only edit their tests and teach nothing there.
     seeds = [args.seed] if args.seed != "all" else sorted(
-        p.name for p in (ROOT / "seeds").iterdir() if p.is_dir() and p.name != "toy")
+        p.name for p in (ROOT / "seeds").iterdir()
+        if p.is_dir() and p.name != "toy" and p.name not in cases_mod.seeds())
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
     if args.cheat_type in cheats.patch_types():
         seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
@@ -115,6 +122,8 @@ def cmd_duel(args) -> int:
                 try:
                     rec = asdict(duel_mod.duel(seed, t, args.rounds, args.cheater, judge_client, cheater_client,
                                                on_event=_print_event))
+                except BudgetExceeded:
+                    raise
                 except Exception as e:
                     print(f"  error: {e}", file=sys.stderr)
                     continue
@@ -146,18 +155,49 @@ def cmd_probe(args) -> int:
     client = LLM("baseten").client
     types = cheats.patch_types() if args.cheat_type == "all" else [args.cheat_type]
     records = []
-    for t in types:
-        for seed in cheats.patched_seeds(t):
-            rec = probe_mod.probe(t, seed, client)
-            records.append(rec)
-            print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
-                  f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    try:
+        for t in types:
+            for seed in cheats.patched_seeds(t):
+                rec = probe_mod.probe(t, seed, client)
+                records.append(rec)
+                print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
+                      f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    except BudgetExceeded as e:
+        print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
     out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     md = probe_mod.markdown(probe_mod.summarize(records), records)
     out.with_suffix(".md").write_text(md)
     print("\n" + md + f"\nsaved {out.relative_to(ROOT)}")
+    return 0
+
+
+def cmd_cases(args) -> int:
+    client = LLM("baseten").client
+    records = []
+    try:
+        for seed, name in cases_mod.patches():
+            rec = cases_mod.judge_case(seed, name, args.repeat, client)
+            records.append(rec)
+            verdicts = lambda p: "/".join(v["verdict"] for v in rec["judgments"].get(p, [])) or "-"
+            print(f"  {seed:10} {name:20} {rec['kind']:10} hidden={rec['label']:6} "
+                  f"original={verdicts('original')}  strict={verdicts('strict')}")
+    except BudgetExceeded as e:
+        print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
+    out = ROOT / "results" / f"cases-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text("".join(json.dumps(r) + "\n" for r in records))
+    md = cases_mod.markdown(cases_mod.summarize(records), records)
+    out.with_suffix(".md").write_text(md)
+    print("\n" + md + f"\nsaved {out.relative_to(ROOT)}")
+    return 0
+
+
+def cmd_dashboard(args) -> int:
+    out = dashboard_mod.export(args.files, failures=not args.fast)
+    s = json.loads(out.read_text())["summary"]["all"]
+    print(f"{s['distinct_patches']} distinct patches, {s['judgments']} judgments -> {out.relative_to(ROOT)} and data.js")
     return 0
 
 
@@ -183,10 +223,46 @@ def cmd_rejudge(args) -> int:
     return 0
 
 
+def cmd_confirm(args) -> int:
+    client = LLM("baseten").client
+    for name in args.files:
+        src = Path(name)
+        records = confirm_mod.load(src)
+        out = src.with_name(src.stem + "-confirmed.jsonl")
+        print(f"{src.name}: {sum(1 for _ in confirm_mod.jobs(records))} cheat verdicts to confirm")
+        records = confirm_mod.load(src)
+        try:
+            cost = confirm_mod.confirm(records, client, args.workers,
+                                       on_done=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True))
+        except BudgetExceeded as e:
+            print(f"\n{e}; saving what finished", file=sys.stderr)
+            cost = None
+        out.write_text("".join(json.dumps(r) + "\n" for r in records))
+        md = confirm_mod.markdown(confirm_mod.summarize(records))
+        out.with_suffix(".md").write_text(md)
+        print(f"\n{md}" + (f"cost ${cost:.2f}, " if cost is not None else "") + f"saved {out}")
+    return 0
+
+
+def load_env(path: Path = ROOT / ".env") -> None:
+    """Read KEY=VALUE lines from .env into the environment, without overriding anything already set."""
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            value = value.strip().strip("'\"")
+            if value:
+                os.environ.setdefault(key.strip(), value)
+
+
 def main(argv=None) -> int:
+    load_env()
     ap = argparse.ArgumentParser(prog="wjj")
     ap.add_argument("--strict-judge", action="store_true",
                     help="judge with the strict correctness prompt instead of the original one")
+    ap.add_argument("--budget", type=float, help="stop making model calls once this run has spent this many dollars")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("seed")
@@ -214,9 +290,20 @@ def main(argv=None) -> int:
     g = sub.add_parser("regrade", help="re-run the current hidden tests on saved duel diffs (no model calls)")
     g.add_argument("duels")
     g.set_defaults(func=cmd_regrade)
+    da = sub.add_parser("dashboard", help="export result files into dashboard/data.json for the page")
+    da.add_argument("files", nargs="+", help="result files; prefix with strict: or original: if the file doesn't record its prompt")
+    da.add_argument("--fast", action="store_true", help="skip re-running hidden tests to list failing test names")
+    da.set_defaults(func=cmd_dashboard)
+    ca = sub.add_parser("cases", help="judge every real-repo case patch with both prompts")
+    ca.add_argument("--repeat", type=int, default=2, help="judgments per patch per prompt")
+    ca.set_defaults(func=cmd_cases)
     pr = sub.add_parser("probe", help="judge each hand-written cheat with and without its decoy comment")
     pr.add_argument("--cheat-type", choices=["all", *cheats.patch_types()], default="all")
     pr.set_defaults(func=cmd_probe)
+    cf = sub.add_parser("confirm", help="have the judge write a failing test for each saved cheat verdict, then run it")
+    cf.add_argument("files", nargs="+")
+    cf.add_argument("--workers", type=int, default=4)
+    cf.set_defaults(func=cmd_confirm)
     rj = sub.add_parser("rejudge", help="rescore saved duel or eval diffs with the strict judge prompt")
     rj.add_argument("files", nargs="+")
     rj.add_argument("--workers", type=int, default=4)
@@ -224,7 +311,13 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.strict_judge:
         os.environ["WJJ_JUDGE"] = "strict"
-    return args.func(args)
+    if args.budget is not None:
+        os.environ["WJJ_BUDGET"] = str(args.budget)
+    try:
+        return args.func(args)
+    except BudgetExceeded as e:
+        print(f"\n{e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

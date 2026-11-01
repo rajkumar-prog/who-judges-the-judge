@@ -66,6 +66,10 @@ def duel(seed: str, cheat_type: str, rounds: int = 3, cheater: str = "meta",
                 cheats.apply(ws, cheat_type)
                 att = asdict(grade(ws, judge_llm, None, "cheat", True, 0, [], on_event))
                 author = "script"
+                if att["label"] == "failed":
+                    # Scripted cheats are checked to pass the visible tests, so this is the setup.
+                    raise RuntimeError(f"the scripted {cheat_type} cheat fails the visible tests for {seed}. "
+                                       "Check the setup: pip install -r requirements.txt, then python scripts/verify_seeds.py")
             else:
                 result = fix(ws, cheater_llm, mode="cheat", feedback=feedback(played), on_event=on_event)
                 att = asdict(grade(ws, judge_llm, None, "cheat", result.finished, result.steps,
