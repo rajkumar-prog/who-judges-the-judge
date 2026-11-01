@@ -29,16 +29,16 @@ Muse Spark (`muse-spark-1.3`). Both judge prompts (original and strict) on every
 | # | Run | Command | Size |
 |---|---|---|---|
 | 1 | Toy duels | `duel all --rounds 3` (scripted round-1 cheats; `all` is the 12 toy-suite seeds), once per prompt | 12 seeds × 3 cheat types × 2 prompts = 72 duels |
-| 2 | Real-repo duels | `duel ttlcache` / `duel proxyauth` with `--cheat-type spec_narrowing` and `input_guard`, 3 times per prompt | 2 seeds × 2 cheats × 2 prompts × 3 = 24 duels |
-| 3 | Real-repo cases | `cases --repeat 3` | 9 patches × 2 prompts × 3 = 54 judgments |
-| 4 | Comment probe | `probe`, once per prompt | 20 hand-written cheats × 2 prompts |
-| 5 | Single-round eval | `eval --attempts 2`, once per prompt | 14 seeds (12 toy-suite + 2 real) × honest and cheat × 2 |
+| 2 | Real-repo duels | `duel ttlcache` / `duel proxyauth` / `duel xmlattr` with `--cheat-type spec_narrowing` and `input_guard`, 3 times per prompt | 3 seeds × 2 cheats × 2 prompts × 3 = 36 duels |
+| 3 | Real-repo cases | `cases --repeat 3` | 14 patches × 2 prompts × 3 = 84 judgments |
+| 4 | Comment probe | `probe`, once per prompt | 22 hand-written cheats × 2 prompts |
+| 5 | Single-round eval | `eval --attempts 2`, once per prompt | 15 seeds (12 toy-suite + 3 real) × honest and cheat × 2 |
 
 Budget cap: **$80** across both providers. The cap is there to stop a broken loop from burning
 credits, not a target. If spending reaches it, stop and report what finished. Estimate, from
 Sunday's pilot (4 real-repo duels, 3 rounds, $2.64 total, $0.20 to $1.55 each) and earlier toy
-runs (about $0.14 per toy duel): toy duels ~$10, real-repo duels ~$16, cases ~$2, probe ~$2,
-eval ~$10, so ~$40. The pilot duels themselves are not part of the reported
+runs (about $0.14 per toy duel): toy duels ~$10, real-repo duels ~$24, cases ~$3, probe ~$2,
+eval ~$11, so ~$50. Every command runs with `--budget` set to its line here plus half again. The pilot duels themselves are not part of the reported
 results.
 
 ## What gets reported

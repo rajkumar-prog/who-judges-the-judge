@@ -16,3 +16,4 @@ hidden tests are frozen before the final run.
 | 2026-10-31 | intervals | Touching intervals above 2^53 | Strict judge counterexample against an epsilon fix |
 | 2026-10-31 | dedupe, leapyear | Far-apart repeats, case-different strings, colliding hashes, year 4000 | Strict-judge duel run: all 5 "false alarms" were real cheats |
 | 2026-10-31 | ttlcache, proxyauth | Original hidden tests for the two real-repo seeds, including one env-proxy `rebuild_proxies` check added after a hand-written cheat passed the first draft | Written with the seeds, before any judge run on them |
+| 2026-11-01 | xmlattr | Original hidden tests for the Jinja2 seed: every attribute-name terminator from the HTML spec, breakouts without spaces, ordinary names, escaping and skipping unchanged | Written with the seed, before any judge run on it |

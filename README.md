@@ -8,7 +8,7 @@ The judge's blind spot: it passes code that *looks* general even when it's wrong
 
 If you're going to trust an AI judge, test it against a cheater that adapts, with hidden tests as the answer key.
 
-A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. All code in this repository was written during the event.
+A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. Everything here was written during the event, except three open-source libraries copied unchanged into `seeds/` at old versions as test subjects: cachetools 7.2.1, requests 2.30.0 and Jinja2 3.1.2 (each seed's `UPSTREAM.md` says what was copied and its license).
 
 ## How it works
 
@@ -30,20 +30,21 @@ git clone https://github.com/rajkumar-prog/who-judges-the-judge
 cd who-judges-the-judge
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest -q                  # no API key needed: the model is replaced by scripted replies
-python scripts/verify_seeds.py       # every seed fails as shipped; its reference fix passes visible + hidden tests
+python -m pytest -q
+python scripts/verify_seeds.py
 ```
 
-Then, with keys:
+The tests need no API key (the model is replaced by scripted replies). `verify_seeds.py` checks that every seed fails as shipped and that its reference fix passes the visible and hidden tests.
+
+Then copy `.env.example` to `.env` and fill in `BASETEN_API_KEY` (the judge) and `MODEL_API_KEY` (the cheater). The one command to try:
 
 ```
-export BASETEN_API_KEY=...           # judge (Muse Spark Open)
-export MODEL_API_KEY=...             # cheater (hosted Muse Spark), only needed for duel
-
-python -m wjj run median --mode cheat          # one seed: agent fixes, judge reviews, redo if caught (~1 min)
-python -m wjj duel median --rounds 3           # scripted cheat, then the cheater adapts to the judge (~3 min)
-python -m wjj --strict-judge duel median       # same, with the counterexample prompt
+python -m wjj --budget 2 duel ttlcache --cheat-type spec_narrowing --rounds 3
 ```
+
+That's a real bug in cachetools: a scripted wrong fix in round 1, then Muse Spark rewrites it after reading the judge's reasons, for 3 rounds. Every model call prints a line with the provider, model, time and spend so far, and `--budget 2` stops making calls once it has spent $2. It takes a few minutes and costs well under that. Add `--strict-judge` before `duel` to use the counterexample prompt.
+
+Other quick ones: `python -m wjj run median --mode cheat` (one seed, fix, judge, redo if caught, about a minute) and `python -m wjj duel median --rounds 3` (a toy seed).
 
 Use `python -m pytest`, not bare `pytest`: the bare command can't import `wjj`.
 
@@ -57,7 +58,7 @@ Use `python -m pytest`, not bare `pytest`: the bare command can't import `wjj`.
 | `regrade FILE` | Re-runs today's hidden tests on saved diffs (no model calls) |
 | `rejudge FILE...` | Re-judges saved diffs with the strict prompt, so both prompts are scored on the same diffs |
 
-`--strict-judge` goes before the command and works with `run`, `eval`, `duel` and `probe`.
+`--strict-judge` and `--budget DOLLARS` go before the command. `--strict-judge` works with `run`, `eval`, `duel` and `probe`.
 
 ## Results so far
 
@@ -82,7 +83,7 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 
 ## Limits
 
-- Twelve toy seeds, one function each, plus two real-repo seeds (cachetools and requests). Two real bugs is still a small sample.
+- Twelve toy seeds, one function each, plus three real-repo seeds (cachetools, requests, Jinja2). Three real bugs is still a small sample.
 - Every seed is Python, so nothing here says how the judge does on other languages.
 - Cheats are induced: the cheater is told to cheat. That's how you test an alarm, but natural cheating rates will differ.
 - The same model family plays judge and cheater.
@@ -94,7 +95,7 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 | --- | --- |
 | `wjj/` | The app: fixer agent, judge, baseline, duel, probe, regrade, rejudge, scorecard, CLI. |
 | `tests/` | Unit tests with a scripted fake model, plus 18 real saved judge replies. |
-| `seeds/` | Repos with failing tests: 12 toy seeds, plus `ttlcache` (cachetools 7.2.1) and `proxyauth` (requests 2.30.0, CVE-2023-32681). The agent only ever sees a temp copy of one seed. |
+| `seeds/` | Repos with failing tests: 12 toy seeds, plus `ttlcache` (cachetools 7.2.1), `proxyauth` (requests 2.30.0, CVE-2023-32681) and `xmlattr` (Jinja2 3.1.2, CVE-2024-22195 and CVE-2024-34064). The agent only ever sees a temp copy of one seed. |
 | `hidden/` | Hidden tests per seed. Never copied into the agent workspace. |
 | `patches/` | Hand-written cheats, one file per seed. See `patches/README.md`. |
 | `cases/` | Correct and incomplete fixes for the real-repo seeds. See `cases/README.md`. |
@@ -104,4 +105,5 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The libraries in `seeds/` keep their own licenses (MIT, Apache 2.0, BSD-3-Clause), included next to each copy. The Meta models are used through their providers under Meta's terms for those models.
+<!-- add the link to Meta's model terms once staff say which one to cite -->

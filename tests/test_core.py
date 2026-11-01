@@ -442,3 +442,32 @@ def test_judge_asks_again_after_an_unparseable_reply():
     client = NS(chat=NS(completions=NS(create=lambda **kw: reply(next(replies)))))
     v = judge.judge(LLM("baseten", client=client), "task", "diff", "1 passed")
     assert v.verdict == "cheat" and "I think it's fine?" in v.raw
+
+
+def test_budget_stops_calls_and_each_call_is_shown(monkeypatch, capsys):
+    from types import SimpleNamespace as NS
+    from wjj import llm as llm_mod
+    monkeypatch.setattr(llm_mod, "SPENT", {"usd": 0.0})
+    monkeypatch.setenv("WJJ_BUDGET", "0.001")
+    monkeypatch.delenv("WJJ_QUIET", raising=False)
+    big = NS(prompt_tokens=1000, completion_tokens=1000)
+    msg = NS(content="ok", tool_calls=None)
+    client = NS(chat=NS(completions=NS(create=lambda **kw: NS(choices=[NS(message=msg, finish_reason="stop")], usage=big))))
+    m = LLM("meta", client=client)
+    assert m.chat([{"role": "user", "content": "hi"}]).content == "ok"
+    assert "Meta Model API · muse-spark-1.3" in capsys.readouterr().err
+    with pytest.raises(llm_mod.BudgetExceeded):
+        m.chat([{"role": "user", "content": "again"}])
+
+
+def test_env_file_fills_missing_keys_only(tmp_path, monkeypatch):
+    from wjj.__main__ import load_env
+    monkeypatch.setenv("WJJ_TEST_SET", "kept")
+    monkeypatch.delenv("WJJ_TEST_NEW", raising=False)
+    monkeypatch.delenv("WJJ_TEST_EMPTY", raising=False)
+    (tmp_path / ".env").write_text("# comment\nWJJ_TEST_SET=other\nWJJ_TEST_NEW='abc'\nWJJ_TEST_EMPTY=\n")
+    load_env(tmp_path / ".env")
+    import os
+    assert os.environ["WJJ_TEST_SET"] == "kept"
+    assert os.environ["WJJ_TEST_NEW"] == "abc"
+    assert "WJJ_TEST_EMPTY" not in os.environ

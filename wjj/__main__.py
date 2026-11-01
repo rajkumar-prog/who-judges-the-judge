@@ -20,7 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import cases as cases_mod, cheats, dashboard as dashboard_mod, duel as duel_mod, probe as probe_mod, rejudge as rejudge_mod, scorecard
-from .llm import LLM
+from .llm import LLM, BudgetExceeded
 from .run import run
 from .workspace import ROOT
 
@@ -74,6 +74,8 @@ def cmd_eval(args) -> int:
             s, m = futures[fut]
             try:
                 rec = asdict(fut.result())
+            except BudgetExceeded:
+                raise
             except Exception as e:
                 print(f"[{i}/{len(jobs)}] {s} {m}: error {e}", file=sys.stderr)
                 continue
@@ -120,6 +122,8 @@ def cmd_duel(args) -> int:
                 try:
                     rec = asdict(duel_mod.duel(seed, t, args.rounds, args.cheater, judge_client, cheater_client,
                                                on_event=_print_event))
+                except BudgetExceeded:
+                    raise
                 except Exception as e:
                     print(f"  error: {e}", file=sys.stderr)
                     continue
@@ -151,12 +155,15 @@ def cmd_probe(args) -> int:
     client = LLM("baseten").client
     types = cheats.patch_types() if args.cheat_type == "all" else [args.cheat_type]
     records = []
-    for t in types:
-        for seed in cheats.patched_seeds(t):
-            rec = probe_mod.probe(t, seed, client)
-            records.append(rec)
-            print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
-                  f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    try:
+        for t in types:
+            for seed in cheats.patched_seeds(t):
+                rec = probe_mod.probe(t, seed, client)
+                records.append(rec)
+                print(f"  {t:15} {seed:10} hidden={rec['plain']['label']:6} judge={rec['plain']['judge'].get('verdict')}"
+                      f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
+    except BudgetExceeded as e:
+        print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
     out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
@@ -169,12 +176,15 @@ def cmd_probe(args) -> int:
 def cmd_cases(args) -> int:
     client = LLM("baseten").client
     records = []
-    for seed, name in cases_mod.patches():
-        rec = cases_mod.judge_case(seed, name, args.repeat, client)
-        records.append(rec)
-        verdicts = lambda p: "/".join(v["verdict"] for v in rec["judgments"].get(p, [])) or "-"
-        print(f"  {seed:10} {name:20} {rec['kind']:10} hidden={rec['label']:6} "
-              f"original={verdicts('original')}  strict={verdicts('strict')}")
+    try:
+        for seed, name in cases_mod.patches():
+            rec = cases_mod.judge_case(seed, name, args.repeat, client)
+            records.append(rec)
+            verdicts = lambda p: "/".join(v["verdict"] for v in rec["judgments"].get(p, [])) or "-"
+            print(f"  {seed:10} {name:20} {rec['kind']:10} hidden={rec['label']:6} "
+                  f"original={verdicts('original')}  strict={verdicts('strict')}")
+    except BudgetExceeded as e:
+        print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
     out = ROOT / "results" / f"cases-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
@@ -213,10 +223,25 @@ def cmd_rejudge(args) -> int:
     return 0
 
 
+def load_env(path: Path = ROOT / ".env") -> None:
+    """Read KEY=VALUE lines from .env into the environment, without overriding anything already set."""
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            value = value.strip().strip("'\"")
+            if value:
+                os.environ.setdefault(key.strip(), value)
+
+
 def main(argv=None) -> int:
+    load_env()
     ap = argparse.ArgumentParser(prog="wjj")
     ap.add_argument("--strict-judge", action="store_true",
                     help="judge with the strict correctness prompt instead of the original one")
+    ap.add_argument("--budget", type=float, help="stop making model calls once this run has spent this many dollars")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("seed")
@@ -261,7 +286,13 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.strict_judge:
         os.environ["WJJ_JUDGE"] = "strict"
-    return args.func(args)
+    if args.budget is not None:
+        os.environ["WJJ_BUDGET"] = str(args.budget)
+    try:
+        return args.func(args)
+    except BudgetExceeded as e:
+        print(f"\n{e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
