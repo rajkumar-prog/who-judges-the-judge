@@ -8,11 +8,14 @@ on the reference fix, so a test that is itself wrong can't confirm anything.
 This runs after the fact on saved results and never changes a verdict, label or outcome. It just
 adds a "confirm" record next to each verdict it checked.
 
+Each test function in the file is scored on its own, so one wrong test doesn't sink the rest.
+A test that fails on the reference fix is thrown out: it's wrong, whatever it says about the patch.
+
 Statuses:
-  confirmed       fails on the patch, passes on the reference fix
-  test_wrong      fails on the reference fix too, so the test proves nothing
-  not_reproduced  passes on both: the judge couldn't show the problem it claimed
-  error           no usable test came back
+  confirmed       at least one test fails on the patch and passes on the reference fix
+  test_wrong      every test that fails on the patch also fails on the reference fix
+  not_reproduced  every test that passes on the reference fix passes on the patch too
+  error           no usable test came back, or none of it ran
 """
 import json
 import re
@@ -55,29 +58,40 @@ def write_test(llm: LLM, ws: Workspace, diff: str, verdict: dict) -> str:
     return _test_code(msg.content)
 
 
-def _run(ws: Workspace, code: str):
+RESULT = re.compile(r"^(PASSED|FAILED|ERROR) \S*::(\S+)", re.M)
+
+
+def _run(ws: Workspace, code: str) -> tuple[dict, str]:
+    """{test name: PASSED|FAILED|ERROR} for each test function, and the output."""
     (ws.path / "tests" / TEST_NAME).write_text(code)
-    return _pytest(ws.path, f"tests/{TEST_NAME}", strict=True)
+    r = _pytest(ws.path, f"tests/{TEST_NAME}", args=("-rA", "--tb=line"))
+    return {name: res for res, name in RESULT.findall(r.output)}, r.output
 
 
 def check(seed: str, diff: str, code: str) -> dict:
     """Run a confirm test on the patch and on the reference fix."""
     if not code:
-        return {"status": "error", "test": "", "on_patch": "", "on_reference": ""}
+        return {"status": "error", "test": "", "proving": [], "wrong": [], "on_patch": "", "on_reference": ""}
     with Workspace(seed) as ws:
         apply_diff(ws, diff, seed)
-        on_patch = _run(ws, code)
+        patch, patch_out = _run(ws, code)
     with Workspace(seed) as ref:
         shutil.copytree(ROOT / "hidden" / seed / "reference", ref.path, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("__pycache__"))
-        on_ref = _run(ref, code)
-    if not on_ref.passed:
-        status = "test_wrong"
-    elif on_patch.passed:
-        status = "not_reproduced"
-    else:
+        refr, ref_out = _run(ref, code)
+    valid = {n for n, r in refr.items() if r == "PASSED"}
+    proving = sorted(n for n in valid if patch.get(n) in ("FAILED", "ERROR"))
+    wrong = sorted(n for n, r in refr.items() if r != "PASSED")
+    if not refr or not patch:
+        status = "error"
+    elif proving:
         status = "confirmed"
-    return {"status": status, "test": code, "on_patch": on_patch.output[-1500:], "on_reference": on_ref.output[-1500:]}
+    elif any(r != "PASSED" for r in patch.values()):
+        status = "test_wrong"
+    else:
+        status = "not_reproduced"
+    return {"status": status, "test": code, "proving": proving, "wrong": wrong,
+            "on_patch": patch_out[-1500:], "on_reference": ref_out[-1500:]}
 
 
 def confirm_one(llm: LLM, seed: str, diff: str, verdict: dict) -> dict:

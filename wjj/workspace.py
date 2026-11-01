@@ -26,11 +26,11 @@ NOT_REAL_PASS = re.compile(r"\b\d+ (skipped|xfailed|xpassed|deselected)\b|no tes
 SAFE_ENV = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")
 
 
-def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False) -> TestResult:
+def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False, args: tuple = ()) -> TestResult:
     env = {k: os.environ[k] for k in SAFE_ENV if k in os.environ}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
-        r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", target],
+        r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args, target],
                            cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
         output = (r.stdout + r.stderr)[-4000:]
         passed = r.returncode == 0 and not (strict and NOT_REAL_PASS.search(output))

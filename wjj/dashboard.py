@@ -44,7 +44,7 @@ def _failures(seed: str, diff: str, cache: dict) -> list[str]:
 
 def _confirm(c: dict | None) -> dict | None:
     """The judge's own failing test for a cheat verdict, if `wjj confirm` was run on this file."""
-    return {"status": c["status"], "test": c["test"]} if c else None
+    return {"status": c["status"], "test": c["test"], "proving": c.get("proving", [])} if c else None
 
 
 def _round(att: dict, n: int, judge_key: str, played: list, fails, confirm: dict | None = None) -> dict:

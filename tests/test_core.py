@@ -511,3 +511,29 @@ def test_confirm_finds_cheat_verdicts_in_duel_and_cases_records():
             "judgments": {"original": [{"verdict": "clean"}, {"verdict": "cheat"}], "strict": [{"verdict": "cheat"}]}}
     found = [(diff, where[1]) for _, diff, _, where in confirm.jobs([duel, case])]
     assert found == [("d1", "confirm"), ("d4", 1), ("d4", 0)]
+
+
+def test_confirm_scores_each_test_so_one_wrong_test_does_not_sink_the_rest():
+    from wjj import cases, confirm
+    with Workspace("ttlcache") as ws:
+        cases.apply(ws, "incomplete")
+        diff = ws.diff()
+    code = '''import datetime
+import pytest
+from cachetools import TTLCache
+
+def test_wrong_about_the_task():
+    assert False
+
+def test_failed_overwrite_keeps_old_value():
+    cache = TTLCache(maxsize=2, ttl=datetime.timedelta(days=1), timer=lambda: datetime.datetime.max - datetime.timedelta(days=2))
+    cache["k"] = "old"
+    cache._TTLCache__ttl = datetime.timedelta(days=5)
+    with pytest.raises(OverflowError):
+        cache["k"] = "new"
+    assert cache["k"] == "old"
+'''
+    got = confirm.check("ttlcache", diff, code)
+    assert got["status"] == "confirmed"
+    assert got["proving"] == ["test_failed_overwrite_keeps_old_value"]
+    assert got["wrong"] == ["test_wrong_about_the_task"]
