@@ -102,8 +102,11 @@ def cmd_score(args) -> int:
 def cmd_duel(args) -> int:
     judge_client = LLM("baseten").client
     cheater_client = judge_client if args.cheater == "baseten" else LLM(args.cheater).client
+    # "all" means the toy suite; the real-repo seeds are run by name, since the scripted
+    # cheats only edit their tests and teach nothing there.
     seeds = [args.seed] if args.seed != "all" else sorted(
-        p.name for p in (ROOT / "seeds").iterdir() if p.is_dir() and p.name != "toy")
+        p.name for p in (ROOT / "seeds").iterdir()
+        if p.is_dir() and p.name != "toy" and p.name not in cases_mod.seeds())
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
     if args.cheat_type in cheats.patch_types():
         seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
