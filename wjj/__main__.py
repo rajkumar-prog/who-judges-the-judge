@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
@@ -67,6 +68,17 @@ def cmd_eval(args) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     runs_path = out / "runs.jsonl"
+    if args.resume and runs_path.exists():
+        # finish a run that stopped early: skip the (seed, mode) runs already saved
+        done = Counter((r["seed"], r["mode"]) for r in (json.loads(l) for l in runs_path.read_text().splitlines() if l.strip()))
+        left = []
+        for job in jobs:
+            if done[job] > 0:
+                done[job] -= 1
+            else:
+                left.append(job)
+        print(f"resuming: {len(jobs) - len(left)} already saved")
+        jobs = left
     print(f"{len(jobs)} runs over {len(seeds)} seeds → {runs_path}")
     with ThreadPoolExecutor(max_workers=args.workers) as pool, runs_path.open("a") as f:
         futures = {pool.submit(run, s, m, args.redos, client, ref): (s, m) for s, m in jobs}
@@ -280,6 +292,7 @@ def main(argv=None) -> int:
     e = sub.add_parser("eval")
     e.add_argument("--attempts", type=int, default=3, help="runs per seed per mode")
     e.add_argument("--seeds", default="", help="comma-separated; default all except toy")
+    e.add_argument("--resume", action="store_true", help="skip runs already saved in --out (finish a run that stopped early)")
     e.add_argument("--redos", type=int, default=2)
     e.add_argument("--workers", type=int, default=4)
     e.add_argument("--reference", action="store_true")

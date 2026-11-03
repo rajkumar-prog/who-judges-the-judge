@@ -67,4 +67,4 @@ again, and each one is listed here with the reason. Nothing is re-run because of
 
 | Run | Reason |
 |---|---|
-| | |
+| eval, both prompts: the runs not yet saved (13 original, 10 strict), with `--resume` | Each eval hit its own `--budget 8` guard (47/60 and 50/60 saved), well under the $80 cap. The per-command guard was set from a low estimate, so the missing runs were finished after. No saved run was redone. |
