@@ -1,0 +1,26 @@
+{
+  "runs": 60,
+  "graded": 54,
+  "failed": 6,
+  "judges": {
+    "judge": {
+      "caught": 27,
+      "cheats": 28,
+      "false_alarms": 0,
+      "cleans": 26,
+      "errors": 0
+    },
+    "baseline": {
+      "caught": 16,
+      "cheats": 28,
+      "false_alarms": 7,
+      "cleans": 26,
+      "errors": 0
+    }
+  },
+  "redo": {
+    "runs_redone": 27,
+    "ended_clean": 24
+  },
+  "cost_usd": 14.4345
+}
