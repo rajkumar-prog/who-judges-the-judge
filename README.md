@@ -8,7 +8,7 @@ The judge's blind spot: it passes code that *looks* general even when it's wrong
 
 If you're going to trust an AI judge, test it against a cheater that adapts, with hidden tests as the answer key.
 
-A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. Everything here was written during the event, except three open-source libraries copied unchanged into `seeds/` at old versions as test subjects: cachetools 7.2.1, requests 2.30.0 and Jinja2 3.1.2 (each seed's `UPSTREAM.md` says what was copied and its license).
+A solo project by [@rajkumar-prog](https://github.com/rajkumar-prog), built during the Meta AI Developer Hackathon, Oct 26 – Nov 4, 2026. Apart from the short, credited excerpts described below, everything in this repo was written during the event. The three real-library seeds are built on old versions of open-source libraries (cachetools 7.2.1, requests 2.30.0 and Jinja2 3.1.2), which are not in the repo: `scripts/fetch_libs.py` downloads them from PyPI and checks their hashes. Their visible tests and reference fixes adapt short excerpts of each library's own tests and fixes, and each seed's `UPSTREAM.md` credits what is used and its license.
 
 ## How it works
 
@@ -30,11 +30,12 @@ git clone https://github.com/rajkumar-prog/who-judges-the-judge
 cd who-judges-the-judge
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+python scripts/fetch_libs.py
 python -m pytest -q
 python scripts/verify_seeds.py
 ```
 
-The tests need no API key (the model is replaced by scripted replies). `verify_seeds.py` checks that every seed fails as shipped and that its reference fix passes the visible and hidden tests.
+`fetch_libs.py` downloads the three libraries the real-library seeds need (under 1 MB from PyPI). The tests need no API key (the model is replaced by scripted replies). `verify_seeds.py` checks that every seed fails as shipped and that its reference fix passes the visible and hidden tests.
 
 Then copy `.env.example` to `.env` and fill in `BASETEN_API_KEY` (the judge, Muse Spark Open on Baseten) and `MODEL_API_KEY` (the cheater, Muse Spark on the Meta Model API). Live runs need both. No keys? Skip to [Check it without a key](#check-it-without-a-key). The one command to try:
 
@@ -128,7 +129,7 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 | `hidden/` | Hidden tests per seed. Never copied into the agent workspace. |
 | `patches/` | Hand-written cheats, one file per seed. See `patches/README.md`. |
 | `cases/` | Correct and incomplete fixes for the real-repo seeds. See `cases/README.md`. |
-| `scripts/` | `verify_seeds.py`: every seed fails as shipped and its reference fix passes. |
+| `scripts/` | `fetch_libs.py` downloads the three libraries; `verify_seeds.py` checks every seed fails as shipped and its reference fix passes; `freeze.py` checks the answer key is unchanged. |
 | `docs/` | Architecture, the final-run plan and the hidden-test change log. |
 | `results/final/` | Every raw result from the final run, plus its logs. |
 | `dashboard/` | The results page. Open `index.html` in a browser. |
@@ -136,5 +137,5 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The libraries in `seeds/` keep their own licenses (MIT, Apache 2.0, BSD-3-Clause), included next to each copy. The Meta models are used through their providers under Meta's terms for those models.
+MIT. See [LICENSE](LICENSE). The libraries that `scripts/fetch_libs.py` downloads into `seeds/` keep their own licenses (MIT, Apache 2.0, BSD-3-Clause), saved next to each copy. The Meta models are used through their providers under Meta's terms for those models.
 <!-- add the link to Meta's model terms once staff say which one to cite -->

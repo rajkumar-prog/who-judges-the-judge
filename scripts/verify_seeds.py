@@ -15,6 +15,10 @@ def pytest(cwd: Path, target: Path) -> bool:
 
 
 def main() -> int:
+    for seed, lib in (("ttlcache", "cachetools"), ("proxyauth", "requests"), ("xmlattr", "jinja2")):
+        if not (ROOT / "seeds" / seed / lib).is_dir():
+            print(f"seeds/{seed}/{lib} is missing. Run: python scripts/fetch_libs.py")
+            return 1
     bad = 0
     for seed in sorted(p for p in (ROOT / "seeds").iterdir() if p.is_dir()):
         hidden = ROOT / "hidden" / seed.name

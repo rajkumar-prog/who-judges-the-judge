@@ -39,6 +39,10 @@ def _pytest(cwd: Path, target: str, timeout: int = 60, strict: bool = False, arg
         return TestResult(False, f"pytest timed out after {timeout}s")
 
 
+# open-source libraries downloaded by scripts/fetch_libs.py, not kept in the repo
+FETCHED = {"ttlcache": "cachetools", "proxyauth": "requests", "xmlattr": "jinja2"}
+
+
 class Workspace:
     def __init__(self, seed: str):
         self.seed = seed
@@ -46,6 +50,9 @@ class Workspace:
         self.hidden_dir = ROOT / "hidden" / seed
         if not self.seed_dir.is_dir():
             raise SystemExit(f"No such seed: {seed}")
+        lib = FETCHED.get(seed)
+        if lib and not (self.seed_dir / lib).is_dir():
+            raise SystemExit(f"seeds/{seed}/{lib} is missing. Run: python scripts/fetch_libs.py")
         self._tmp = tempfile.TemporaryDirectory(prefix=f"wjj-{seed}-")
         # Resolve now: on macOS the temp dir sits behind a symlink (/var -> /private/var), and
         # resolve() below would otherwise see every path as escaping the workspace.
