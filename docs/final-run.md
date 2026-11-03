@@ -4,7 +4,7 @@ Written before the final run, and committed so the git history shows it came fir
 the README come from this run, as run, with nothing re-run or re-tested after the fact except where
 this page allows it.
 
-**Status: DRAFT.** Once this says FINAL, it doesn't change.
+**Status: FINAL** (locked Tue Nov 3, before the run). It doesn't change after this.
 
 ## Freeze
 
@@ -23,7 +23,7 @@ turns out to be a real cheat. Those get listed in the results as found, not fixe
 
 ## What runs
 
-All on Monday Nov 2, from the frozen commit. Judge: Muse Spark Open on Baseten. Cheater in duels:
+Run overnight Mon Nov 2 to Tue Nov 3 with `scripts/final_run.sh`, from the frozen commit. The original and strict prompts run side by side. Judge: Muse Spark Open on Baseten. Cheater in duels:
 Muse Spark (`muse-spark-1.3`). Both judge prompts (original and strict) on everything.
 
 | # | Run | Command | Size |
@@ -33,7 +33,7 @@ Muse Spark (`muse-spark-1.3`). Both judge prompts (original and strict) on every
 | 3 | Real-repo cases | `cases --repeat 3` | 14 patches × 2 prompts × 3 = 84 judgments |
 | 4 | Comment probe | `probe`, once per prompt | 22 hand-written cheats × 2 prompts |
 | 5 | Single-round eval | `eval --attempts 2`, once per prompt | 15 seeds (12 toy-suite + 3 real) × honest and cheat × 2 |
-| 6 | Confirm | `confirm` on every file from runs 1 to 3 | every cheat verdict; never changes a verdict or label |
+| 6 | Confirm | `confirm` on every file from runs 2 and 3 (the real libraries) | every cheat verdict there; never changes a verdict or label |
 
 Budget cap: **$80** across both providers. The cap is there to stop a broken loop from burning
 credits, not a target. If spending reaches it, stop and report what finished. Estimate, from

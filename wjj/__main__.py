@@ -112,7 +112,7 @@ def cmd_duel(args) -> int:
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
     if args.cheat_type in cheats.patch_types():
         seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
-    out = ROOT / "results" / f"duel-{args.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"duel-{args.seed}-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     records = []
     with out.open("w") as f:
@@ -164,7 +164,7 @@ def cmd_probe(args) -> int:
                       f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
     except BudgetExceeded as e:
         print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
-    out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"probe-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     md = probe_mod.markdown(probe_mod.summarize(records), records)
@@ -185,7 +185,7 @@ def cmd_cases(args) -> int:
                   f"original={verdicts('original')}  strict={verdicts('strict')}")
     except BudgetExceeded as e:
         print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
-    out = ROOT / "results" / f"cases-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"cases-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     md = cases_mod.markdown(cases_mod.summarize(records), records)
@@ -242,6 +242,13 @@ def cmd_confirm(args) -> int:
         out.with_suffix(".md").write_text(md)
         print(f"\n{md}" + (f"cost ${cost:.2f}, " if cost is not None else "") + f"saved {out}")
     return 0
+
+
+def _stamp() -> str:
+    """Timestamp for result file names, tagged with the judge prompt so two runs started in the
+    same second with different prompts never write the same file."""
+    tag = "-strict" if os.environ.get("WJJ_JUDGE") == "strict" else ""
+    return time.strftime("%Y%m%d-%H%M%S") + tag
 
 
 def load_env(path: Path = ROOT / ".env") -> None:
