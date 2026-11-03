@@ -2,6 +2,11 @@
 
 The page reads one data file made from saved results, so nothing on it is typed by hand.
 
+Open `dashboard/index.html` in a browser, straight from disk. It uses `data.js` if it's there and
+falls back to `sample-data.js`. Four pages: 01 Experiment (every duel as a row of squares), 02 Duel
+replay (patch, judge verdict and hidden test results side by side), 03 Results, 04 Method. `D`
+toggles dark mode, arrow keys step through rounds in the replay.
+
 ```
 python -m wjj dashboard strict:results/duel-a.jsonl results/cases-b.jsonl ...
 ```

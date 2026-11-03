@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who Judges the Judge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="top">
+  <span>Who Judges the Judge? &mdash; Case library</span>
+  <button id="theme" title="Dark mode (D)">D</button>
+</div>
+<div class="shell">
+  <nav>
+    <div class="mark">wjj.</div>
+    <div class="tagline">An archive of judgments &amp; evidence.</div>
+    <div class="links-row">
+      <a href="#experiment" data-page="experiment">01 Experiment</a>
+      <a href="#replay" data-page="replay">02 Duel replay</a>
+      <a href="#results" data-page="results">03 Results</a>
+      <a href="#method" data-page="method">04 Method</a>
+    </div>
+    <div class="foot">Independent research.<br>Case files, not confidence.</div>
+  </nav>
+  <main><div class="page" id="page"></div></main>
+</div>
+<div class="status"><span id="path">case-library</span><span id="source"></span></div>
+<div class="tip" id="tip"></div>
+
+<script src="data.js"></script>
+<script>
+  if (!window.WJJ_DATA) document.write('<script src="sample-data.js"><\/script>');
+</script>
+<script src="app.js"></script>
+</body>
+</html>

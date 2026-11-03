@@ -54,7 +54,7 @@ def _round(att: dict, n: int, judge_key: str, played: list, fails, confirm: dict
             "judge": _verdict(att.get(judge_key)),
             "outcome": outcome(att, judge_key) if att.get(judge_key) else "failed",
             "baseline": (att.get("baseline") or {}).get("verdict", ""),
-            "feedback_after": feedback(played) if att.get(judge_key, {}).get("verdict") == "cheat" else "",
+            "feedback_after": feedback(played) if played and att.get(judge_key, {}).get("verdict") == "cheat" else "",
             "confirm": _confirm(confirm)}
 
 
