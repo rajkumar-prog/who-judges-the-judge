@@ -15,7 +15,10 @@
   const LIB = { ttlcache: "cachetools", proxyauth: "requests", xmlattr: "Jinja2" };
 
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const judged = r => r.outcome !== "failed";
+  // a single-round eval is scored on its first attempt only; later attempts come after judge feedback
+  // and stay for the replay
+  RUNS.forEach(r => r.rounds.forEach((rd, i) => { rd.redo = r.kind === "eval" && i > 0; }));
+  const judged = rd => rd.outcome !== "failed" && !rd.redo;
   const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "—";
   const frac = (a, b) => b ? `${a} / ${b}` : "— / —";
 
@@ -253,7 +256,7 @@
     const sets = [["Real-library duels", r => r.kind === "duel" && r.suite === "real"],
                   ["Real-library cases", r => r.kind === "case"],
                   ["Toy duels", r => r.kind === "duel" && r.suite === "toy"],
-                  ["Single-round eval", r => r.kind === "eval"]];
+                  ["Single-round eval (first attempts)", r => r.kind === "eval"]];
     const cell = (a, b, good) => `<td class="n ${b ? (a === (good ? b : 0) ? "ok" : "") : ""}">${frac(a, b)}${b ? ` <small>${pct(a, b)}</small>` : ""}</td>`;
     const rows = sets.map(([name, f]) => {
       const t = prompts.map(p => tally(pairs((r, rd) => f(r) && r.prompt === p && judged(rd))));
