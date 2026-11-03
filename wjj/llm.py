@@ -73,7 +73,8 @@ class LLM:
             from openai import OpenAI
             key = os.environ.get(cfg["key_env"])
             if not key:
-                raise SystemExit(f"Set {cfg['key_env']} to use the {self.provider} provider.")
+                raise SystemExit(f"{cfg['key_env']} isn't set, and the {cfg['label']} model needs it. "
+                                 "No key? You can still check every saved result: see 'Check it without a key' in the README.")
             self.client = OpenAI(api_key=key, base_url=cfg["base_url"])
 
     def chat(self, messages, tools=None, max_tokens=8000, retries=3):
