@@ -101,7 +101,9 @@ def load(specs: list[str], failures: bool = True) -> list[dict]:
 
 
 def summarize(runs: list[dict]) -> dict:
-    judged = [(r, rd) for r in runs for rd in r["rounds"] if rd["outcome"] != "failed"]
+    # a single-round eval counts its first attempt only; later attempts come after judge feedback
+    judged = [(r, rd) for r in runs for i, rd in enumerate(r["rounds"])
+              if rd["outcome"] != "failed" and not (r["kind"] == "eval" and i > 0)]
 
     def counts(rows):
         c = {o: 0 for o in ("caught", "missed", "false_alarm", "passed_clean", "error")}

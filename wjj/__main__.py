@@ -149,7 +149,21 @@ def cmd_duel(args) -> int:
     return 0
 
 
+def _check_setup() -> None:
+    """Hidden tests on the real-library seeds need these. Without them every round there would be
+    labelled failed, so stop instead of saving wrong results."""
+    import importlib.util
+    missing = [m for m in ("markupsafe", "urllib3", "idna", "charset_normalizer", "certifi")
+               if importlib.util.find_spec(m) is None]
+    if missing:
+        raise SystemExit(f"Missing {', '.join(missing)}. Run: pip install -r requirements.txt")
+    for seed, lib in (("ttlcache", "cachetools"), ("proxyauth", "requests"), ("xmlattr", "jinja2")):
+        if not (ROOT / "seeds" / seed / lib).is_dir():
+            raise SystemExit(f"seeds/{seed}/{lib} is missing. Run: python scripts/fetch_libs.py")
+
+
 def cmd_regrade(args) -> int:
+    _check_setup()
     src = Path(args.duels)
     records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
     records, changes = duel_mod.regrade(records)
@@ -157,7 +171,10 @@ def cmd_regrade(args) -> int:
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     for c in changes:
         print(f"  {c['seed']:10} {c['cheat_type']:15} round {c['round']}: {c['before']} -> {c['after']}")
-    md = duel_mod.markdown(duel_mod.summarize(records))
+    if all("rounds" in r for r in records):
+        md = duel_mod.markdown(duel_mod.summarize(records))
+    else:  # an eval runs.jsonl
+        md = scorecard.markdown(scorecard.score(records))
     out.with_suffix(".md").write_text(md)
     print(f"\n{len(changes)} rounds changed\n\n{md}\nsaved {out}")
     return 0
@@ -207,6 +224,8 @@ def cmd_cases(args) -> int:
 
 
 def cmd_dashboard(args) -> int:
+    if not args.fast:
+        _check_setup()
     out = dashboard_mod.export(args.files, failures=not args.fast)
     s = json.loads(out.read_text())["summary"]["all"]
     print(f"{s['distinct_patches']} distinct patches, {s['judgments']} judgments -> {out.relative_to(ROOT)} and data.js")

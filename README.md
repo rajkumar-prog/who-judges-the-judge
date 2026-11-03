@@ -77,15 +77,15 @@ From one frozen run on Nov 3, 2026. The plan, the hidden tests and the cheats we
 | Toy duels: wrong fixes caught | 99 / 103 | 101 / 101 |
 | Toy duels: false alarms | 1 / 1 | 4 / 4 |
 | Hand-written cheats (probe) | 18 / 22 | 22 / 22 |
-| Single-round eval: cheats caught (first attempts) | 25 / 26 | 21 / 21 |
-| Single-round eval: false alarms (first attempts) | 0 / 26 | 1 / 30 |
+| Single-round eval: cheats caught (first attempts) | 27 / 28 | 21 / 21 |
+| Single-round eval: false alarms (first attempts) | 0 / 26 | 1 / 31 |
 
 - **The fixed patches:** the original judge passed the requests CVE-2023-32681 `spec_narrowing` cheat on all 3 tries. Both prompts accepted all 6 correct fixes every time, including the libraries' own upstream fixes, and both caught Jinja2's own first, incomplete fix for CVE-2024-22195.
 - **The cost of strict:** it raised 5 false alarms in duels, and 4 of them came on the toy seeds, out of only 4 correct fixes there. Their reasons name specific inputs (for example, "duplicates more than 8 apart are not removed"), so some may be real bugs the hidden tests don't check. I haven't verified that, and the hidden tests stay frozen, so they count as false alarms.
 - **The judge proves its verdicts:** for each cheat verdict on real code, the judge wrote a pytest test. It counts as confirmed only if it fails on the patch and passes on the library's real fix. In duels, 22 of 28 original and 32 of 47 strict verdicts were confirmed. On the fixed patches, 26 of 45 were. Every other attempt returned no usable test (error); none was wrong and none failed to reproduce.
-- **Regex baseline:** caught 4 of the 22 hand-written cheats, and on the eval 16/26 and 13/21 cheats with 7/26 and 8/30 false alarms.
-- **As run:** 1 of the 36 toy duels per prompt didn't run (the scripted `weaken_asserts` cheat for `phone` fails the visible tests). Eval stopped at its per-command budget and was finished with `--resume`; 57 of 60 runs per prompt saved (the 3 missing are xmlattr). Both are logged in the plan.
-- The run cost about $60 in model calls, split about evenly between Baseten and the Meta Model API.
+- **Regex baseline:** caught 4 of the 22 hand-written cheats, and on the eval 16/28 and 13/21 cheats with 7/26 and 8/31 false alarms.
+- **As run:** 1 of the 36 toy duels per prompt didn't run (the scripted `weaken_asserts` cheat for `phone` fails the visible tests). Eval stopped at its per-command budget and was finished with `--resume` (all 60 runs per prompt), and so was confirm on the fixed patches. Both are logged in the plan.
+- The run cost about $70 in model calls, split about evenly between Baseten and the Meta Model API.
 
 Earlier, smaller runs are in the git history and [docs/hidden-tests-log.md](docs/hidden-tests-log.md).
 
@@ -97,7 +97,7 @@ You don't need an API key to check any number above. Every saved round has the d
 python -m wjj regrade results/final/duel-all-20261103-000532.jsonl
 ```
 
-re-runs the hidden tests on every saved diff and checks each label, with no model calls. It works on any `results/final/duel-*.jsonl` file.
+re-runs the hidden tests on every saved diff and checks each label, with no model calls. It works on any `results/final/duel-*.jsonl` file and on `results/final/eval-*/runs.jsonl`.
 
 To see every duel, round by round, open `dashboard/index.html` in a browser. To rebuild its data from the raw files:
 
