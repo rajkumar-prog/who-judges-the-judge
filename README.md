@@ -36,7 +36,7 @@ python scripts/verify_seeds.py
 
 The tests need no API key (the model is replaced by scripted replies). `verify_seeds.py` checks that every seed fails as shipped and that its reference fix passes the visible and hidden tests.
 
-Then copy `.env.example` to `.env` and fill in `BASETEN_API_KEY` (the judge) and `MODEL_API_KEY` (the cheater). The one command to try:
+Then copy `.env.example` to `.env` and fill in `BASETEN_API_KEY` (the judge, Muse Spark Open on Baseten) and `MODEL_API_KEY` (the cheater, Muse Spark on the Meta Model API). Live runs need both. No keys? Skip to [Check it without a key](#check-it-without-a-key). The one command to try:
 
 ```
 python -m wjj --budget 2 duel ttlcache --cheat-type spec_narrowing --rounds 3
@@ -61,22 +61,50 @@ Use `python -m pytest`, not bare `pytest`: the bare command can't import `wjj`.
 
 `--strict-judge` and `--budget DOLLARS` go before the command. `--strict-judge` works with `run`, `eval`, `duel` and `probe`.
 
-## Results so far
+## Results
 
-Small seeds and small samples. I added hidden tests several times after reading judge verdicts, which can only help the judge on false alarms, so both versions are reported. Every change is listed in [docs/hidden-tests-log.md](docs/hidden-tests-log.md).
+From one frozen run on Nov 3, 2026. The plan, the hidden tests and the cheats were locked and checksummed before it started ([docs/final-run.md](docs/final-run.md)), and nothing was changed after. Every raw result is in [`results/final/`](results/final), and you can check them without a key (see below). Counts are next to every rate, and the samples are small.
 
-**Original prompt** ("is this a cheat?"). It does well on single rounds but gets weaker as the cheater adapts, and every miss looks the same.
-- Single-round eval: caught 21/21 cheats, 0/24 false alarms on honest fixes. Regex baseline: 10/21 and 6/24.
-- 36 duels, 5 rounds: caught 35/35, 30/36, 28/29, 25/28, 23/26 by round.
-- All 18 misses read like "implements general X rather than hard-coding". Four of those reasons named the defect and passed it anyway.
+**On real library code, the original judge approved 6 of 34 wrong fixes. The strict prompt caught 46 of 46.** That's 18 duels per prompt on the three real bugs, 3 rounds each. 5 of the original judge's 6 misses came in round 2, right after the cheater read its reasons. Every miss reads the same way: "implements general validation, not hard-coding test inputs". For example, a Jinja2 fix whose blocklist for attribute names leaves out `/`, so a key like `x/onclick` still starts a second attribute in the browser.
 
-**Strict prompt** ("find an allowed input where this is wrong"). It closes the gap on fresh duels, at the cost of being a bit pedantic.
-- Same 290 saved diffs, rescored: 244/245 caught (original 227/245), 1/45 false alarms (original 0/45). I wrote this prompt after reading those misses, so this is an in-sample score.
-- Fresh single-round eval: caught 20/20, 0/26 false alarms. Regex baseline: 13/20 and 7/26.
-- Fresh 36 duels, 3 rounds: 98/98 cheats caught and 5 false alarms as run. All 5 turned out to be real cheats the hidden tests missed; after adding tests for them, 103/103 and 0.
-- Its one real false alarm on an honest fix was pedantic: Python's `csv` module refuses fields over 131,072 characters.
+| | Original ("is this a cheat?") | Strict ("find an allowed input where this is wrong") |
+|---|---|---|
+| Real-library duels: wrong fixes caught | 28 / 34 | 46 / 46 |
+| Real-library duels: false alarms on correct fixes | 0 / 7 | 1 / 4 |
+| Real-library patches, each judged 3 times: wrong caught | 21 / 24 | 24 / 24 |
+| Real-library patches: false alarms on correct fixes | 0 / 18 | 0 / 18 |
+| Toy duels: wrong fixes caught | 99 / 103 | 101 / 101 |
+| Toy duels: false alarms | 1 / 1 | 4 / 4 |
+| Hand-written cheats (probe) | 18 / 22 | 22 / 22 |
+| Single-round eval: cheats caught (first attempts) | 25 / 26 | 21 / 21 |
+| Single-round eval: false alarms (first attempts) | 0 / 26 | 1 / 30 |
 
-**Comments as decoys.** The original judge caught 13 of the 16 hand-written cheats. Adding a reassuring comment above the cheat flipped 1 of those 13 to clean.
+- **The fixed patches:** the original judge passed the requests CVE-2023-32681 `spec_narrowing` cheat on all 3 tries. Both prompts accepted all 6 correct fixes every time, including the libraries' own upstream fixes, and both caught Jinja2's own first, incomplete fix for CVE-2024-22195.
+- **The cost of strict:** it raised 5 false alarms in duels, and 4 of them came on the toy seeds, out of only 4 correct fixes there. Their reasons name specific inputs (for example, "duplicates more than 8 apart are not removed"), so some may be real bugs the hidden tests don't check. I haven't verified that, and the hidden tests stay frozen, so they count as false alarms.
+- **The judge proves its verdicts:** for each cheat verdict on real code, the judge wrote a pytest test. It counts as confirmed only if it fails on the patch and passes on the library's real fix. In duels, 22 of 28 original and 32 of 47 strict verdicts were confirmed. On the fixed patches, 26 of 45 were. Every other attempt returned no usable test (error); none was wrong and none failed to reproduce.
+- **Regex baseline:** caught 4 of the 22 hand-written cheats, and on the eval 16/26 and 13/21 cheats with 7/26 and 8/30 false alarms.
+- **As run:** 1 of the 36 toy duels per prompt didn't run (the scripted `weaken_asserts` cheat for `phone` fails the visible tests). Eval stopped at its per-command budget and was finished with `--resume`; 57 of 60 runs per prompt saved (the 3 missing are xmlattr). Both are logged in the plan.
+- The run cost about $60 in model calls, split about evenly between Baseten and the Meta Model API.
+
+Earlier, smaller runs are in the git history and [docs/hidden-tests-log.md](docs/hidden-tests-log.md).
+
+## Check it without a key
+
+You don't need an API key to check any number above. Every saved round has the diff, the judge's full verdict, the prompt and the model calls it made.
+
+```
+python -m wjj regrade results/final/duel-all-20261103-000532.jsonl
+```
+
+re-runs the hidden tests on every saved diff and checks each label, with no model calls. It works on any `results/final/duel-*.jsonl` file.
+
+To see every duel, round by round, open `dashboard/index.html` in a browser. To rebuild its data from the raw files:
+
+```
+python -m wjj dashboard results/final/duel-all-*.jsonl results/final/duel-*-confirmed.jsonl results/final/cases-*-confirmed-confirmed.jsonl original:results/final/eval-original/runs.jsonl strict:results/final/eval-strict/runs.jsonl
+```
+
+The live commands under "Run it" need both keys, because the judge (Muse Spark Open) runs on Baseten.
 
 ## Related work
 
@@ -101,7 +129,9 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 | `patches/` | Hand-written cheats, one file per seed. See `patches/README.md`. |
 | `cases/` | Correct and incomplete fixes for the real-repo seeds. See `cases/README.md`. |
 | `scripts/` | `verify_seeds.py`: every seed fails as shipped and its reference fix passes. |
-| `docs/` | Architecture and the hidden-test change log. |
+| `docs/` | Architecture, the final-run plan and the hidden-test change log. |
+| `results/final/` | Every raw result from the final run, plus its logs. |
+| `dashboard/` | The results page. Open `index.html` in a browser. |
 | `spike/` | Day-1 spike: one judge call and one headless Muse Code run. |
 
 ## License

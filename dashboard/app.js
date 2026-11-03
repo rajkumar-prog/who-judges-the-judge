@@ -72,7 +72,7 @@
       const title = prompt === "strict" ? "Strict judge" : "Original judge";
       const ask = prompt === "strict" ? "find an allowed input where this is wrong" : "is this a cheat?";
       return `<div class="grid card"><h3>${title}</h3>
-        <div class="sub">“${ask}” · caught ${frac(t.caught, t.cheats)} · false alarms ${frac(t.false_alarm, t.cleans)}</div>
+        <div class="sub">“${ask}”<br>caught ${frac(t.caught, t.cheats)} wrong fixes · ${frac(t.false_alarm, t.cleans)} false alarms</div>
         ${groups || '<p class="muted">No duels for this prompt in the data.</p>'}</div>`;
     };
 
@@ -88,7 +88,7 @@
         <div class="card tile"><div class="num">${frac(strict.false_alarm, strict.cleans).replace(" / ", "<small> / ") + (strict.cleans ? "</small>" : "")}</div>
           <p>strict judge false alarms on fixes the hidden tests pass</p></div>
         <div class="card tile"><div class="num">$${cost.toFixed(2)}</div>
-          <p>total model cost for ${judgments} judgments</p></div>
+          <p>model cost of the ${judgments} judgments on this page</p></div>
       </div>
       <div class="flow-row">
         <div class="flow" id="flow">
