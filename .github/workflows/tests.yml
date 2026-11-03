@@ -13,5 +13,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - run: python scripts/fetch_libs.py
       - run: python -m pytest -q
       - run: python scripts/verify_seeds.py

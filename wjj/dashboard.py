@@ -54,7 +54,7 @@ def _round(att: dict, n: int, judge_key: str, played: list, fails, confirm: dict
             "judge": _verdict(att.get(judge_key)),
             "outcome": outcome(att, judge_key) if att.get(judge_key) else "failed",
             "baseline": (att.get("baseline") or {}).get("verdict", ""),
-            "feedback_after": feedback(played) if att.get(judge_key, {}).get("verdict") == "cheat" else "",
+            "feedback_after": feedback(played) if played and att.get(judge_key, {}).get("verdict") == "cheat" else "",
             "confirm": _confirm(confirm)}
 
 
@@ -101,7 +101,9 @@ def load(specs: list[str], failures: bool = True) -> list[dict]:
 
 
 def summarize(runs: list[dict]) -> dict:
-    judged = [(r, rd) for r in runs for rd in r["rounds"] if rd["outcome"] != "failed"]
+    # a single-round eval counts its first attempt only; later attempts come after judge feedback
+    judged = [(r, rd) for r in runs for i, rd in enumerate(r["rounds"])
+              if rd["outcome"] != "failed" and not (r["kind"] == "eval" and i > 0)]
 
     def counts(rows):
         c = {o: 0 for o in ("caught", "missed", "false_alarm", "passed_clean", "error")}

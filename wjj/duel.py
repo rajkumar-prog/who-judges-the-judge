@@ -97,19 +97,19 @@ def regrade(records: list[dict]) -> tuple[list[dict], list[dict]]:
     Use it after strengthening hidden tests: labels and outcomes change, the judge's verdicts don't."""
     changes = []
     for rec in records:
-        for att in rec["rounds"]:
+        for n, att in enumerate(rec.get("rounds") or rec.get("attempts") or [], 1):  # duel or eval file
             if not att["diff"]:
                 continue
             with Workspace(rec["seed"]) as ws:
-                apply_diff(ws, att["diff"], f"{rec['seed']} round {att['round']}")
+                apply_diff(ws, att["diff"], f"{rec['seed']} round {att.get('round', n)}")
                 visible, hidden = ws.run_tests(), ws.run_hidden()
                 new_label = label(visible.passed, hidden.passed, ws.touched_files())
-            before = att["outcome"]
+            before = att.get("outcome") or outcome(att)
             att.update(label=new_label, visible_passed=visible.passed, hidden_passed=hidden.passed)
             att["outcome"] = outcome(att)
             if att["outcome"] != before:
-                changes.append({"seed": rec["seed"], "cheat_type": rec["cheat_type"], "round": att["round"],
-                                "before": before, "after": att["outcome"]})
+                changes.append({"seed": rec["seed"], "cheat_type": rec.get("cheat_type") or rec.get("mode", ""),
+                                "round": att.get("round", n), "before": before, "after": att["outcome"]})
     return records, changes
 
 

@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
@@ -67,6 +68,17 @@ def cmd_eval(args) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     runs_path = out / "runs.jsonl"
+    if args.resume and runs_path.exists():
+        # finish a run that stopped early: skip the (seed, mode) runs already saved
+        done = Counter((r["seed"], r["mode"]) for r in (json.loads(l) for l in runs_path.read_text().splitlines() if l.strip()))
+        left = []
+        for job in jobs:
+            if done[job] > 0:
+                done[job] -= 1
+            else:
+                left.append(job)
+        print(f"resuming: {len(jobs) - len(left)} already saved")
+        jobs = left
     print(f"{len(jobs)} runs over {len(seeds)} seeds → {runs_path}")
     with ThreadPoolExecutor(max_workers=args.workers) as pool, runs_path.open("a") as f:
         futures = {pool.submit(run, s, m, args.redos, client, ref): (s, m) for s, m in jobs}
@@ -112,7 +124,7 @@ def cmd_duel(args) -> int:
     types = cheats.TYPES if args.cheat_type == "all" else (args.cheat_type,)
     if args.cheat_type in cheats.patch_types():
         seeds = [s for s in seeds if s in cheats.patched_seeds(args.cheat_type)]
-    out = ROOT / "results" / f"duel-{args.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"duel-{args.seed}-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     records = []
     with out.open("w") as f:
@@ -137,7 +149,21 @@ def cmd_duel(args) -> int:
     return 0
 
 
+def _check_setup() -> None:
+    """Hidden tests on the real-library seeds need these. Without them every round there would be
+    labelled failed, so stop instead of saving wrong results."""
+    import importlib.util
+    missing = [m for m in ("markupsafe", "urllib3", "idna", "charset_normalizer", "certifi")
+               if importlib.util.find_spec(m) is None]
+    if missing:
+        raise SystemExit(f"Missing {', '.join(missing)}. Run: pip install -r requirements.txt")
+    for seed, lib in (("ttlcache", "cachetools"), ("proxyauth", "requests"), ("xmlattr", "jinja2")):
+        if not (ROOT / "seeds" / seed / lib).is_dir():
+            raise SystemExit(f"seeds/{seed}/{lib} is missing. Run: python scripts/fetch_libs.py")
+
+
 def cmd_regrade(args) -> int:
+    _check_setup()
     src = Path(args.duels)
     records = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
     records, changes = duel_mod.regrade(records)
@@ -145,7 +171,10 @@ def cmd_regrade(args) -> int:
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     for c in changes:
         print(f"  {c['seed']:10} {c['cheat_type']:15} round {c['round']}: {c['before']} -> {c['after']}")
-    md = duel_mod.markdown(duel_mod.summarize(records))
+    if all("rounds" in r for r in records):
+        md = duel_mod.markdown(duel_mod.summarize(records))
+    else:  # an eval runs.jsonl
+        md = scorecard.markdown(scorecard.score(records))
     out.with_suffix(".md").write_text(md)
     print(f"\n{len(changes)} rounds changed\n\n{md}\nsaved {out}")
     return 0
@@ -164,7 +193,7 @@ def cmd_probe(args) -> int:
                       f"  with comment={rec['decoy']['judge'].get('verdict')}{'  FLIPPED' if rec['flipped'] else ''}")
     except BudgetExceeded as e:
         print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
-    out = ROOT / "results" / f"probe-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"probe-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     md = probe_mod.markdown(probe_mod.summarize(records), records)
@@ -185,7 +214,7 @@ def cmd_cases(args) -> int:
                   f"original={verdicts('original')}  strict={verdicts('strict')}")
     except BudgetExceeded as e:
         print(f"\n{e}; saving the {len(records)} finished", file=sys.stderr)
-    out = ROOT / "results" / f"cases-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    out = ROOT / "results" / f"cases-{_stamp()}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r) + "\n" for r in records))
     md = cases_mod.markdown(cases_mod.summarize(records), records)
@@ -195,6 +224,8 @@ def cmd_cases(args) -> int:
 
 
 def cmd_dashboard(args) -> int:
+    if not args.fast:
+        _check_setup()
     out = dashboard_mod.export(args.files, failures=not args.fast)
     s = json.loads(out.read_text())["summary"]["all"]
     print(f"{s['distinct_patches']} distinct patches, {s['judgments']} judgments -> {out.relative_to(ROOT)} and data.js")
@@ -244,6 +275,13 @@ def cmd_confirm(args) -> int:
     return 0
 
 
+def _stamp() -> str:
+    """Timestamp for result file names, tagged with the judge prompt so two runs started in the
+    same second with different prompts never write the same file."""
+    tag = "-strict" if os.environ.get("WJJ_JUDGE") == "strict" else ""
+    return time.strftime("%Y%m%d-%H%M%S") + tag
+
+
 def load_env(path: Path = ROOT / ".env") -> None:
     """Read KEY=VALUE lines from .env into the environment, without overriding anything already set."""
     if not path.is_file():
@@ -273,6 +311,7 @@ def main(argv=None) -> int:
     e = sub.add_parser("eval")
     e.add_argument("--attempts", type=int, default=3, help="runs per seed per mode")
     e.add_argument("--seeds", default="", help="comma-separated; default all except toy")
+    e.add_argument("--resume", action="store_true", help="skip runs already saved in --out (finish a run that stopped early)")
     e.add_argument("--redos", type=int, default=2)
     e.add_argument("--workers", type=int, default=4)
     e.add_argument("--reference", action="store_true")
