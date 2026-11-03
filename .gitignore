@@ -11,3 +11,8 @@ build/
 spike/out/
 results/*
 !results/final/
+
+# downloaded by scripts/fetch_libs.py
+seeds/ttlcache/cachetools/
+seeds/proxyauth/requests/
+seeds/xmlattr/jinja2/
