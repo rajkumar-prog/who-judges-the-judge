@@ -2,7 +2,7 @@
 
 **Dashboard:** [rajkumar-prog.github.io/who-judges-the-judge/dashboard](https://rajkumar-prog.github.io/who-judges-the-judge/dashboard/), every duel round by round, no key needed.
 
-<!-- before submitting: add the demo video link here -->
+**Demo video (3 min):** [youtu.be/am2cSAxM5GY](https://youtu.be/am2cSAxM5GY)
 
 AI coding agents can make your tests pass without fixing the bug, for example by hardcoding the test inputs or weakening the asserts. I pitted an AI judge against a cheater that adapts to the judge's feedback.
 
