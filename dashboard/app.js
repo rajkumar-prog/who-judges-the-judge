@@ -267,6 +267,21 @@
       `<details class="more"><summary>${names.length - k} more</summary><ul class="fails ${cls}">${names.slice(k).map(li).join("")}</ul></details>`;
   }
 
+  // one proving test function, cut out of the judge's test file (prefer one without parameters)
+  function provingSnippet(c) {
+    if (!c.test || !c.proving.length) return "";
+    const src = c.test.replace(/^```\w*\n?|```\s*$/g, "");
+    const name = (c.proving.find(t => !t.includes("[")) || c.proving[0]).split("[")[0];
+    const lines = src.split("\n");
+    let i = lines.findIndex(l => l.startsWith(`def ${name}(`));
+    if (i < 0) return "";
+    while (i > 0 && lines[i - 1].startsWith("@")) i--;
+    let j = i + 1;
+    while (j < lines.length && !lines[j].startsWith("def ") && !lines[j].startsWith("@") && !/^[A-Za-z_#]/.test(lines[j])) j++;
+    const body = lines.slice(i, j).join("\n").trimEnd();
+    return body.split("\n").length > 18 ? "" : `<div class="label" style="margin:10px 0 4px">one of the tests it wrote</div><pre class="snippet">${esc(body)}</pre>`;
+  }
+
   function confirmCard(r, rd) {
     const c = rd.confirm;
     let body;
@@ -279,7 +294,8 @@
         error: "No usable test came back, or it didn't run."
       }[c.status];
       body = `<span class="chip ${c.status}">${c.status.replace("_", " ")}</span><p style="margin:10px 0 0">${say}</p>` +
-        (c.proving.length ? `<div style="margin-top:8px">${testList(c.proving, "ok")}</div>` : "") +
+        (c.status === "confirmed" ? provingSnippet(c) : "") +
+        (c.proving.length ? `<div class="label" style="margin:10px 0 4px">tests that fail on this patch, pass on the real fix</div>${testList(c.proving, "ok")}` : "") +
         (c.test ? `<details style="margin-top:8px;padding:6px 10px"><summary>test_wjj_confirm.py</summary><pre>${esc(c.test)}</pre></details>` : "");
     } else if (rd.judge.verdict === "cheat") {
       body = `<span class="chip">not run</span><p style="margin:10px 0 0" class="muted">Judge-written tests were only run on the real-library results.</p>`;

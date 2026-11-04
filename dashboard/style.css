@@ -145,6 +145,7 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .told { border-left: 3px solid var(--fa); background: var(--card); padding: 10px 14px; margin: 0 0 12px; }
 .told p { margin: 4px 0 0; font-size: 13px; }
 .told details.more { margin: 6px 0 0; }
+.snippet { font: 12px/1.5 var(--mono); background: var(--evidence); padding: 10px 12px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 details.more { padding: 0; border: none; background: none; margin: -4px 0 10px; }
 details.more summary { font: 11px var(--mono); color: var(--muted); cursor: pointer; }
 .dhead { align-items: end; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
