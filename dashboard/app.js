@@ -119,7 +119,12 @@
           <div class="box" data-s="3"><b>Hidden tests</b>decide what it really was</div>
           <div class="back" data-s="4">← the judge's reasons go back to the cheater, which tries again</div>
         </div>
-        <button class="btn" id="play">▶ Play a round</button>
+        <button class="btn" id="play">▶ Play a real duel</button>
+      </div>
+      <div class="story" id="story" hidden>
+        <div class="story-head"><span id="story-round"></span><span class="story-dots" id="story-dots"></span></div>
+        <p id="story-text"></p>
+        <a id="story-link" hidden>Open this duel in the replay →</a>
       </div>
       <h2>Every duel, round by round</h2>
       <p class="lede" style="margin-bottom:12px">One row per duel, one square per round, the same cheat against each judge. A duel ends when the judge says clean, so a red or blue square is always the last one in its row. Click any square to replay it.</p>
@@ -145,15 +150,73 @@
     document.getElementById("play").onclick = play;
   }
 
+  // plays one real duel from the data through the flow diagram, step by step, with what actually happened
   let playing = null;
+  function storyDuel() {
+    const real = RUNS.filter(r => r.kind === "duel" && r.suite === "real" && r.prompt === "original");
+    const missedAfterCatch = r => r.rounds.length >= 2 && r.rounds[0].outcome === "caught" && r.rounds.some(rd => rd.outcome === "missed");
+    // the Jinja2 duel where the fix's blocklist forgot "/" is the one the write-up walks through
+    return real.find(r => r.seed === "xmlattr" && missedAfterCatch(r) && r.rounds.some(rd => rd.outcome === "missed" && rd.hidden_failures.some(t => t.includes("-/]"))))
+      || real.find(missedAfterCatch) || RUNS.find(r => r.kind === "duel") || null;
+  }
+  function storySteps(r) {
+    const cut = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+    const steps = [];
+    r.rounds.forEach((rd, i) => {
+      const round = `Round ${rd.n} of ${r.rounds.length} · ${r.seed}${LIB[r.seed] ? " (" + LIB[r.seed] + ")" : ""}`;
+      steps.push({ s: 0, round, text: i === 0 ? `The round 1 fix is a scripted cheat (${r.cheat_type}). It looks like a real fix.`
+        : "Muse Spark has read the judge's reasons and rewrites the fix to get past it." });
+      steps.push({ s: 1, round, text: rd.visible_passed ? "It passes every visible test. A normal CI check would go green here."
+        : "It fails the visible tests, so it never reaches the judge." });
+      if (rd.outcome === "failed") return;
+      const verdict = rd.judge.verdict === "cheat" ? "Cheat" : rd.judge.verdict === "clean" ? "Clean" : "No verdict";
+      steps.push({ s: 2, round, text: `The judge says <b>${verdict}</b>. “${esc(cut(rd.judge.reason || rd.judge.evidence, 140))}”` });
+      const k = rd.hidden_failures.length;
+      const tail = { caught: `<b class="good">Caught.</b> The judge was right.`, missed: `<b class="bad">Missed.</b> The judge approved a wrong fix.`,
+        false_alarm: `<b class="warn">False alarm.</b> The fix was fine.`, passed_clean: `<b class="good">Correct fix, approved.</b>` }[rd.outcome] || "";
+      steps.push({ s: 3, round, outcome: rd.outcome, text: (rd.label === "cheat" ? `${k} hidden test${k === 1 ? "" : "s"} fail. ` : "Every hidden test passes. ") + tail });
+      if (i < r.rounds.length - 1) steps.push({ s: 4, round, text: "The judge's reasons go back to the cheater, and it tries again." });
+    });
+    return steps;
+  }
   function play() {
-    clearInterval(playing);
-    const steps = [...document.querySelectorAll("#flow [data-s]")];
+    clearTimeout(playing);
+    const r = storyDuel();
+    if (!r) return;
+    const boxes = [...document.querySelectorAll("#flow [data-s]")];
+    const story = document.getElementById("story"), text = document.getElementById("story-text"),
+          head = document.getElementById("story-round"), dots = document.getElementById("story-dots"),
+          link = document.getElementById("story-link"), btn = document.getElementById("play");
+    const steps = storySteps(r);
+    story.hidden = false; link.hidden = true; btn.textContent = "Playing…"; btn.disabled = true;
+    dots.innerHTML = steps.map(() => "<i></i>").join("");
+    boxes.forEach(b => b.classList.remove("lit", "done", "good", "bad"));
     let i = 0;
-    playing = setInterval(() => {
-      steps.forEach(s => s.classList.toggle("lit", +s.dataset.s === i % 5));
-      if (++i >= 15) { clearInterval(playing); setTimeout(() => steps.forEach(s => s.classList.remove("lit")), 700); }
-    }, 700);
+    const step = () => {
+      if (!document.body.contains(story)) return;
+      if (i >= steps.length) {
+        btn.textContent = "↺ Play again"; btn.disabled = false;
+        const missedAt = r.rounds.findIndex(rd => rd.outcome === "missed") + 1 || r.rounds.length;
+        link.href = `#replay/${r.id}/${missedAt}`; link.hidden = false;
+        boxes.forEach(b => b.classList.remove("lit"));
+        return;
+      }
+      const st = steps[i];
+      if (st.s === 0) boxes.forEach(b => b.classList.remove("done", "good", "bad"));
+      boxes.forEach(b => {
+        const s = +b.dataset.s;
+        b.classList.toggle("lit", s === st.s);
+        if (s < st.s && st.s !== 4) b.classList.add("done");
+      });
+      if (st.s === 3) boxes[3].classList.add(st.outcome === "missed" || st.outcome === "false_alarm" ? "bad" : "good");
+      head.textContent = st.round;
+      text.classList.remove("in"); void text.offsetWidth;
+      text.innerHTML = st.text; text.classList.add("in");
+      [...dots.children].forEach((d, j) => d.className = j < i ? "past" : j === i ? "now" : "");
+      i++;
+      playing = setTimeout(step, st.s === 2 || st.s === 3 ? 3200 : 2200);
+    };
+    step();
   }
 
   // ---------- 02 Duel replay ----------
@@ -335,17 +398,22 @@
     // real-library cases, patch by patch
     const cases = RUNS.filter(r => r.kind === "case");
     const patches = [...new Set(cases.map(r => r.seed + "/" + r.patch))].sort();
-    const caseRows = patches.map(k => {
-      const [seed, patch] = k.split("/");
-      const mine = cases.filter(r => r.seed === seed && r.patch === patch);
-      const label = mine[0].rounds[0].label;
-      const cells = prompts.map(p => {
-        const rs = mine.filter(r => r.prompt === p).map(r => r.rounds[0]);
-        const right = rs.filter(rd => rd.outcome === (label === "cheat" ? "caught" : "passed_clean")).length;
-        const errs = rs.filter(rd => rd.outcome === "error").length;
-        return `<td class="n ${rs.length && right === rs.length ? "ok" : "bad"}">${right} / ${rs.length}${errs ? ` <small>(${errs} error)</small>` : ""}</td>`;
+    // one small card per library, one line per patch
+    const caseSeeds = [...new Set(cases.map(r => r.seed))].sort();
+    const caseCards = caseSeeds.map(seed => {
+      const lines = patches.filter(k => k.startsWith(seed + "/")).map(k => {
+        const patch = k.split("/")[1];
+        const mine = cases.filter(r => r.seed === seed && r.patch === patch);
+        const label = mine[0].rounds[0].label;
+        const cells = prompts.map(p => {
+          const rs = mine.filter(r => r.prompt === p).map(r => r.rounds[0]);
+          const right = rs.filter(rd => rd.outcome === (label === "cheat" ? "caught" : "passed_clean")).length;
+          const errs = rs.filter(rd => rd.outcome === "error").length;
+          return `<span class="n ${rs.length && right === rs.length ? "ok" : "bad"}" title="${p} judge${errs ? `, ${errs} error` : ""}">${right}/${rs.length}</span>`;
+        }).join("");
+        return `<div class="cline"><span><span class="mono">${esc(patch)}</span> <small class="tag ${label}">${label === "cheat" ? "wrong" : "correct"}</small></span>${cells}</div>`;
       }).join("");
-      return `<tr><td><span class="mono">${esc(patch)}</span><br><small class="muted">${esc(LIB[seed] || seed)} · ${esc(mine[0].patch_kind)}</small></td><td>${label === "cheat" ? "wrong, catch it" : "correct, accept it"}</td>${cells}</tr>`;
+      return `<div class="card ccard"><div class="chead"><b>${esc(LIB[seed] || seed)}</b><span>orig</span><span>strict</span></div>${lines}</div>`;
     }).join("");
 
     // judge-written tests
@@ -368,14 +436,12 @@
         <tr><th></th><th>Wrong fixes caught</th><th>False alarms / good fixes</th><th>Errors</th><th>Wrong fixes caught</th><th>False alarms / good fixes</th><th>Errors</th></tr></thead>
         <tbody>${rows}${baseline}</tbody>
       </table>
-      <div class="two" style="margin-top:16px">
-        <div class="card bars"><div class="label">Duels: catch rate by round</div>${byRound("real")}${byRound("toy")}
-          <p class="note">Each round counts only duels still going. From round 2 the cheater has read the judge's reasons.</p></div>
-        <div class="card" style="padding:0">
-          <div class="label" style="padding:16px 16px 8px">Real-library controls: same patch, judged repeatedly</div>
-          ${caseRows ? `<table style="border:none"><thead><tr><th>Patch</th><th>Should be</th><th>Original right</th><th>Strict right</th></tr></thead><tbody>${caseRows}</tbody></table>` : `<p class="muted" style="padding:0 16px">No case results in the data.</p>`}
-        </div>
-      </div>
+      <h2>Does the judge get worse as the cheater adapts?</h2>
+      <div class="card bars"><div class="two"><div>${byRound("real")}</div><div>${byRound("toy")}</div></div>
+        <p class="note">Each round counts only duels still going. From round 2 the cheater has read the judge's reasons.</p></div>
+      <h2>Same patch, judged 3 times</h2>
+      <p class="note" style="margin:-4px 0 10px">Fixed patches on real libraries. Each number is right answers out of tries.</p>
+      <div class="ccards">${caseCards || '<p class="muted">No case results in the data.</p>'}</div>
       <h2>Did the judge prove it?</h2>
       <table>
         <thead><tr><th></th><th>Cheat verdicts, real code</th><th>Confirmed by its own test</th><th>Test was wrong</th><th>Couldn't reproduce</th><th>Error</th><th>Not run</th><th>Confirmed on a fix the hidden tests pass</th></tr></thead>
