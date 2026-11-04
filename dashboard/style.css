@@ -127,7 +127,7 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .dsum span:first-child { color: var(--text); text-transform: uppercase; letter-spacing: .06em; }
 .dgroup { font: 600 13px var(--sans); margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .dgroup span { font: 11px var(--mono); color: var(--muted); font-weight: 400; margin-left: 6px; }
-.duels details.toy { margin-top: 14px; border-top: 1px solid var(--line); }
+.duels details.toy { margin-top: 14px; padding: 0; border: none; border-top: 1px solid var(--line); background: none; }
 .duels details.toy summary { cursor: pointer; list-style: none; }
 .duels details.toy summary::-webkit-details-marker { display: none; }
 .duels details.toy[open] summary span:first-child { color: var(--blue); }

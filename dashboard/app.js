@@ -81,7 +81,7 @@
     const rowsFor = list => list.sort((a, b) => a.key.localeCompare(b.key)).map(x => {
       const n = Object.values(byKey).filter(y => y.suite === x.suite && y.seed === x.seed && y.what === x.what).length;
       const label = x.suite === "real" ? `${x.what}${n > 1 ? " #" + x.rep : ""}` : `${x.seed} · ${x.what}${n > 1 ? " #" + x.rep : ""}`;
-      return `<div class="drow"><span class="name" title="${esc(x.seed + " · " + label)}">${esc(label)}</span>${squares(x.original)}${squares(x.strict)}</div>`;
+      return `<div class="drow"><span class="name" title="${esc(x.suite === "real" ? x.seed + " · " + label : label)}">${esc(label)}</span>${squares(x.original)}${squares(x.strict)}</div>`;
     }).join("");
     const all = Object.values(byKey);
     const realSeeds = [...new Set(all.filter(x => x.suite === "real").map(x => x.seed))].sort();
