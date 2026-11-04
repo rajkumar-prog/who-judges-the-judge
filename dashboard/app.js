@@ -147,7 +147,8 @@
       };
       b.onmouseleave = () => { tip.style.display = "none"; };
     });
-    document.getElementById("play").onclick = play;
+    clearTimeout(playing); resume = null; paused = false;
+    document.getElementById("play").onclick = onPlay;
   }
 
   // plays one real duel from the data through the flow diagram, step by step, with what actually happened
@@ -179,8 +180,17 @@
     });
     return steps;
   }
+  // the play button doubles as pause/resume while a story is running
+  let paused = false, resume = null;
+  function onPlay() {
+    const btn = document.getElementById("play");
+    if (resume && !paused) { paused = true; clearTimeout(playing); btn.textContent = "▶ Resume"; return; }
+    if (resume && paused) { paused = false; btn.textContent = "❚❚ Pause"; resume(); return; }
+    play();
+  }
+
   function play() {
-    clearTimeout(playing);
+    clearTimeout(playing); paused = false;
     const r = storyDuel();
     if (!r) return;
     const boxes = [...document.querySelectorAll("#flow [data-s]")];
@@ -188,14 +198,14 @@
           head = document.getElementById("story-round"), dots = document.getElementById("story-dots"),
           link = document.getElementById("story-link"), btn = document.getElementById("play");
     const steps = storySteps(r);
-    story.hidden = false; link.hidden = true; btn.textContent = "Playing…"; btn.disabled = true;
+    story.hidden = false; link.hidden = true; btn.textContent = "❚❚ Pause";
     dots.innerHTML = steps.map(() => "<i></i>").join("");
     boxes.forEach(b => b.classList.remove("lit", "done", "good", "bad"));
     let i = 0;
     const step = () => {
-      if (!document.body.contains(story)) return;
+      if (!document.body.contains(story)) { resume = null; return; }
       if (i >= steps.length) {
-        btn.textContent = "↺ Play again"; btn.disabled = false;
+        btn.textContent = "↺ Play again"; resume = null;
         const missedAt = r.rounds.findIndex(rd => rd.outcome === "missed") + 1 || r.rounds.length;
         link.href = `#replay/${r.id}/${missedAt}`; link.hidden = false;
         boxes.forEach(b => b.classList.remove("lit"));
@@ -214,8 +224,9 @@
       text.innerHTML = st.text; text.classList.add("in");
       [...dots.children].forEach((d, j) => d.className = j < i ? "past" : j === i ? "now" : "");
       i++;
-      playing = setTimeout(step, st.s === 2 || st.s === 3 ? 3200 : 2200);
+      playing = setTimeout(step, st.s === 2 || st.s === 3 ? 5000 : 3200);
     };
+    resume = () => { playing = setTimeout(step, 1200); };
     step();
   }
 
