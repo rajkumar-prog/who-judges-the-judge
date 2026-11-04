@@ -553,7 +553,10 @@
     tip.style.display = "none";
     if (fn !== replay) replay.current = null;
     fn(...rest);
-    if (!rest.length) window.scrollTo(0, 0);
+    // a new page or a different run starts at the top; stepping rounds of the same run keeps the scroll
+    const where = name + "/" + (rest[0] || "");
+    if (!rest.length || where !== route.last) window.scrollTo(0, 0);
+    route.last = where;
   }
   window.addEventListener("hashchange", route);
   document.getElementById("source").textContent =
