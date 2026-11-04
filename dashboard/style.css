@@ -186,6 +186,9 @@ select { font: 12px var(--mono); padding: 6px 8px; background: var(--card); colo
 .task { background: var(--card); border: 1px solid var(--line); padding: 14px 16px; white-space: pre-wrap; font: 13px/1.55 var(--sans); max-height: 560px; overflow: auto; }
 .verdict { font: 500 30px/1 var(--serif); margin: 6px 0 10px; }
 .says p, .shows p { margin: 0 0 10px; font-size: 13px; }
+.says, .shows { overflow-wrap: anywhere; min-width: 0; }
+.caret { display: inline-block; font-style: normal; transition: transform .15s; }
+details.toy[open] .caret { transform: rotate(90deg); }
 .shows { background: var(--evidence); border-color: var(--evidence); }
 .says .quote { border-left: 3px solid var(--line); padding-left: 10px; }
 .evline { font: 12px var(--mono); background: var(--mark); padding: 4px 6px; margin: 0 0 10px; word-break: break-word; }

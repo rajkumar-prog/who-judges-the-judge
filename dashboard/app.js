@@ -96,7 +96,7 @@
         <div class="drow dsum"><span>Real libraries, ${all.length - toy.length} duels</span><span>${sum("real", "original")}</span><span>${sum("real", "strict")}</span></div>
         ${realSeeds.map(seed => `<div class="dgroup">${esc(LIB[seed] || seed)} <span>${esc(seed)}</span></div>` +
           rowsFor(all.filter(x => x.suite === "real" && x.seed === seed))).join("")}
-        ${toy.length ? `<details class="toy"><summary class="drow dsum"><span>▸ Toy seeds, ${toy.length} duels</span><span>${sum("toy", "original")}</span><span>${sum("toy", "strict")}</span></summary>
+        ${toy.length ? `<details class="toy"><summary class="drow dsum"><span><i class="caret">▸</i> Toy seeds, ${toy.length} duels</span><span>${sum("toy", "original")}</span><span>${sum("toy", "strict")}</span></summary>
           ${rowsFor(toy)}</details>` : ""}
       </div>` : '<p class="muted">No duels in the data.</p>';
 
@@ -338,7 +338,7 @@
         <select id="group" aria-label="kind of run">${groupSel}</select>
         <select id="pick" aria-label="which one">${itemSel}</select>
         <div class="rounds" id="judges">${judgeBtns}</div>
-        <div class="rounds" id="rounds">${rounds}</div>
+        ${r.kind === "case" ? "" : `<div class="rounds" id="rounds">${rounds}</div>`}
         <span class="label">${esc(what)} · round ${n} by ${esc(author)}${endNote ? " · " + endNote : ""}</span>
         <span class="pill ${rd.outcome}">${PILL[rd.outcome]}</span>
       </div>
