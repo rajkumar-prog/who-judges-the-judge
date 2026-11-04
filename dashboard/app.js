@@ -59,29 +59,43 @@
     const judgments = pairs((r, rd) => judged(rd)).length;
 
     const duels = RUNS.filter(r => r.kind === "duel");
-    const panel = prompt => {
-      const mine = keyed(duels.filter(r => r.prompt === prompt));
-      const groups = [["real", "Real libraries"], ["toy", "Toy seeds"]].map(([suite, title]) => {
-        const rows = mine.filter(x => x.r.suite === suite).sort((a, b) => a.key.localeCompare(b.key));
-        if (!rows.length) return "";
-        return `<div class="group">${title} (${rows.length} duels)</div>` + rows.map(({ r, rep }) => {
-          const width = Math.max(3, r.rounds.length);
-          let sq = "";
-          for (let n = 1; n <= width; n++) {
-            const rd = r.rounds[n - 1];
-            sq += rd ? `<button class="sq ${rd.outcome}" data-run="${esc(r.id)}" data-n="${n}" aria-label="round ${n} ${rd.outcome}"></button>`
-                     : `<span class="sq none"></span>`;
-          }
-          return `<div class="row"><span class="name" title="${esc(runLabel(r, rep))}">${esc(runLabel(r, rep))}</span><span class="squares">${sq}</span></div>`;
-        }).join("");
-      }).join("");
-      const t = tally(pairs((r, rd) => r.kind === "duel" && r.prompt === prompt && judged(rd)));
-      const title = prompt === "strict" ? "Strict judge" : "Original judge";
-      const ask = prompt === "strict" ? "find an allowed input where this is wrong" : "is this a cheat?";
-      return `<div class="grid card"><h3>${title}</h3>
-        <div class="sub">“${ask}”<br>caught ${frac(t.caught, t.cheats)} wrong fixes · ${frac(t.false_alarm, t.cleans)} false alarms</div>
-        ${groups || '<p class="muted">No duels for this prompt in the data.</p>'}</div>`;
+    // one row per duel, the original and strict judge side by side; rows pair up by seed, cheat and repeat
+    const byKey = {};
+    ["original", "strict"].forEach(prompt => keyed(duels.filter(r => r.prompt === prompt)).forEach(({ r, key, rep }) => {
+      (byKey[key] = byKey[key] || { key, rep, suite: r.suite, seed: r.seed, what: r.cheat_type || r.patch })[prompt] = r;
+    }));
+    const squares = r => {
+      if (!r) return `<span class="squares muted">not run</span>`;
+      let sq = "";
+      for (let n = 1; n <= Math.max(3, r.rounds.length); n++) {
+        const rd = r.rounds[n - 1];
+        sq += rd ? `<button class="sq ${rd.outcome}" data-run="${esc(r.id)}" data-n="${n}" aria-label="round ${n} ${rd.outcome}"></button>`
+                 : `<span class="sq none"></span>`;
+      }
+      return `<span class="squares">${sq}</span>`;
     };
+    const sum = (suite, prompt) => {
+      const t = tally(pairs((r, rd) => r.kind === "duel" && r.suite === suite && r.prompt === prompt && judged(rd)));
+      return `caught ${frac(t.caught, t.cheats)}` + (t.cleans ? ` · ${frac(t.false_alarm, t.cleans)} false alarms` : "");
+    };
+    const rowsFor = list => list.sort((a, b) => a.key.localeCompare(b.key)).map(x => {
+      const n = Object.values(byKey).filter(y => y.suite === x.suite && y.seed === x.seed && y.what === x.what).length;
+      const label = x.suite === "real" ? `${x.what}${n > 1 ? " #" + x.rep : ""}` : `${x.seed} · ${x.what}${n > 1 ? " #" + x.rep : ""}`;
+      return `<div class="drow"><span class="name" title="${esc(x.seed + " · " + label)}">${esc(label)}</span>${squares(x.original)}${squares(x.strict)}</div>`;
+    }).join("");
+    const all = Object.values(byKey);
+    const realSeeds = [...new Set(all.filter(x => x.suite === "real").map(x => x.seed))].sort();
+    const toy = all.filter(x => x.suite === "toy");
+    const duelTable = all.length ? `<div class="duels card">
+        <div class="drow dhead"><span></span>
+          <span><b>Original judge</b><i>“is this a cheat?”</i></span>
+          <span><b>Strict judge</b><i>“find an allowed input where this is wrong”</i></span></div>
+        <div class="drow dsum"><span>Real libraries, ${all.length - toy.length} duels</span><span>${sum("real", "original")}</span><span>${sum("real", "strict")}</span></div>
+        ${realSeeds.map(seed => `<div class="dgroup">${esc(LIB[seed] || seed)} <span>${esc(seed)}</span></div>` +
+          rowsFor(all.filter(x => x.suite === "real" && x.seed === seed))).join("")}
+        ${toy.length ? `<details class="toy"><summary class="drow dsum"><span>▸ Toy seeds, ${toy.length} duels</span><span>${sum("toy", "original")}</span><span>${sum("toy", "strict")}</span></summary>
+          ${rowsFor(toy)}</details>` : ""}
+      </div>` : '<p class="muted">No duels in the data.</p>';
 
     page.innerHTML = `
       <div class="crumb">01 / Experiment</div>
@@ -108,8 +122,8 @@
         <button class="btn" id="play">▶ Play a round</button>
       </div>
       <h2>Every duel, round by round</h2>
-      <p class="lede" style="margin-bottom:12px">One row per duel, one square per round. A duel ends when the judge says clean, so a red or blue square is always the last one in its row. Click any square to replay it.</p>
-      <div class="grids">${panel("original")}${panel("strict")}</div>
+      <p class="lede" style="margin-bottom:12px">One row per duel, one square per round, the same cheat against each judge. A duel ends when the judge says clean, so a red or blue square is always the last one in its row. Click any square to replay it.</p>
+      ${duelTable}
       <div class="legend">
         <span><i class="sq caught"></i>caught</span><span><i class="sq missed"></i>missed (wrong fix approved)</span>
         <span><i class="sq false_alarm"></i>false alarm</span><span><i class="sq passed_clean"></i>passed clean</span>

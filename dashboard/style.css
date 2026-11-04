@@ -115,6 +115,22 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .legend .sq { cursor: default; }
 .tip { position: fixed; z-index: 10; background: var(--text); color: var(--bg); font: 11px/1.4 var(--mono);
   padding: 6px 8px; pointer-events: none; max-width: 280px; display: none; }
+.duels { padding: 8px 20px 16px; }
+.drow { display: grid; grid-template-columns: minmax(150px, 220px) 1fr 1fr; gap: 16px; align-items: center; min-height: 28px; }
+.drow .name { font: 12px var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.duels .sq { width: 18px; height: 18px; }
+.duels .squares { gap: 5px; }
+.dhead { align-items: end; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
+.dhead b { display: block; font: 500 18px var(--serif); }
+.dhead i { font: 11px var(--mono); color: var(--muted); font-style: normal; }
+.dsum { font: 11px var(--mono); color: var(--muted); padding: 10px 0 4px; }
+.dsum span:first-child { color: var(--text); text-transform: uppercase; letter-spacing: .06em; }
+.dgroup { font: 600 13px var(--sans); margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.dgroup span { font: 11px var(--mono); color: var(--muted); font-weight: 400; margin-left: 6px; }
+.duels details.toy { margin-top: 14px; border-top: 1px solid var(--line); }
+.duels details.toy summary { cursor: pointer; list-style: none; }
+.duels details.toy summary::-webkit-details-marker { display: none; }
+.duels details.toy[open] summary span:first-child { color: var(--blue); }
 .grid-row-tally { font: 11px var(--mono); color: var(--muted); margin-left: auto; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
@@ -199,6 +215,9 @@ tr:last-child td { border-bottom: none; }
   .flow-row { flex-direction: column; align-items: stretch; }
   main { padding: 16px; }
   .tiles, .steps, .links { grid-template-columns: 1fr 1fr; }
+  .drow { grid-template-columns: 110px 1fr 1fr; gap: 8px; }
+  .duels .sq { width: 13px; height: 13px; }
+  .duels .squares { gap: 3px; }
   .grids, .two, .quotes, .band { grid-template-columns: 1fr; }
   .limits { columns: 1; }
   .flow { flex-direction: column; } .flow .arrow { height: 20px; width: auto; } .flow .back { display: none; }
