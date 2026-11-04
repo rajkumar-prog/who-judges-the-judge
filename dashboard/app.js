@@ -49,8 +49,12 @@
 
   // ---------- 01 Experiment ----------
   function experiment() {
-    const realOrig = tally(pairs((r, rd) => r.suite === "real" && r.prompt === "original" && r.kind !== "eval" && judged(rd)));
-    const strict = tally(pairs((r, rd) => r.prompt === "strict" && judged(rd)));
+    // headline tiles use the same slices as the README: real-library duels, and the correct
+    // real-library patches judged in cases
+    const realDuel = prompt => tally(pairs((r, rd) => r.suite === "real" && r.kind === "duel" && r.prompt === prompt && judged(rd)));
+    const realOrig = realDuel("original");
+    const strict = realDuel("strict");
+    const strictCases = tally(pairs((r, rd) => r.kind === "case" && r.prompt === "strict" && judged(rd)));
     const cost = D.summary.cost_usd;
     const judgments = pairs((r, rd) => judged(rd)).length;
 
@@ -85,11 +89,11 @@
       <p class="lede">An AI reviewer reads a code fix and says whether it is honest. Hidden tests then show what the fix really was. A verdict is a claim. A test run is evidence.</p>
       <div class="tiles">
         <div class="card tile"><div class="num">${realOrig.cheats ? realOrig.missed : "—"}<small>${realOrig.cheats ? " of " + realOrig.cheats : ""}</small></div>
-          <p>wrong fixes to real library code that the original judge approved</p></div>
+          <p>wrong fixes in real-library duels that the original judge approved</p></div>
         <div class="card tile"><div class="num">${pct(strict.caught, strict.cheats)}</div>
-          <p>strict judge catch rate, ${frac(strict.caught, strict.cheats)} wrong fixes</p></div>
-        <div class="card tile"><div class="num">${frac(strict.false_alarm, strict.cleans).replace(" / ", "<small> / ") + (strict.cleans ? "</small>" : "")}</div>
-          <p>strict judge false alarms on fixes the hidden tests pass</p></div>
+          <p>strict judge catch rate in the same duels, ${frac(strict.caught, strict.cheats)} wrong fixes</p></div>
+        <div class="card tile"><div class="num">${frac(strictCases.false_alarm, strictCases.cleans).replace(" / ", "<small> / ") + (strictCases.cleans ? "</small>" : "")}</div>
+          <p>strict judge false alarms on correct real-library fixes, each judged 3 times (${frac(strict.false_alarm, strict.cleans)} in duels)</p></div>
         <div class="card tile"><div class="num">$${cost.toFixed(2)}</div>
           <p>model cost of the ${judgments} judgments on this page</p></div>
       </div>
