@@ -204,16 +204,28 @@
     n = Math.min(Math.max(+n || 1, 1), r.rounds.length);
     const rd = r.rounds[n - 1];
 
+    // three small pickers instead of one long list: what kind of run, which one, which judge
     const groups = [["duel", "real", "Real-library duels"], ["duel", "toy", "Toy duels"],
-                    ["case", "real", "Real-library cases"], ["eval", "real", "Single-round eval, real"], ["eval", "toy", "Single-round eval, toy"]];
-    const options = groups.map(([kind, suite, title]) => {
-      const list = keyed(RUNS.filter(x => x.kind === kind && x.suite === suite)).sort((a, b) => a.key.localeCompare(b.key) || a.r.prompt.localeCompare(b.r.prompt));
-      if (!list.length) return "";
-      return `<optgroup label="${title}">` + list.map(({ r: x, rep }) =>
-        `<option value="${esc(x.id)}"${x.id === r.id ? " selected" : ""}>${esc(runLabel(x, rep))} · ${x.prompt} judge</option>`).join("") + "</optgroup>";
+                    ["case", "real", "Fixed real-library patches"], ["eval", "real", "Single-round eval, real"], ["eval", "toy", "Single-round eval, toy"]]
+      .filter(([kind, suite]) => RUNS.some(x => x.kind === kind && x.suite === suite));
+    const gi = Math.max(0, groups.findIndex(([kind, suite]) => kind === r.kind && suite === r.suite));
+    const inGroup = keyed(RUNS.filter(x => x.kind === groups[gi][0] && x.suite === groups[gi][1]));
+    const myKey = (inGroup.find(x => x.r.id === r.id) || {}).key;
+    const twin = prompt => (inGroup.find(x => x.key === myKey && x.r.prompt === prompt) || {}).r;
+    const items = [];
+    inGroup.sort((a, b) => a.key.localeCompare(b.key)).forEach(x => { if (!items.some(y => y.key === x.key)) items.push(x); });
+    const groupSel = groups.map(([kind, suite, title], i) => `<option value="${i}"${i === gi ? " selected" : ""}>${title}</option>`).join("");
+    const itemSel = items.map(x => `<option value="${esc(x.key)}"${x.key === myKey ? " selected" : ""}>${esc(runLabel(x.r, x.rep))}</option>`).join("");
+    const judgeBtns = ["original", "strict"].map(pr => {
+      const t = twin(pr);
+      return `<button data-run="${t ? esc(t.id) : ""}" class="${pr === r.prompt ? "on" : ""}" ${t ? "" : "disabled title='not run with this judge'"}>${pr === "strict" ? "Strict judge" : "Original judge"}</button>`;
     }).join("");
     const rounds = Array.from({ length: Math.max(3, r.rounds.length) }, (_, i) =>
       `<button data-n="${i + 1}" class="${i + 1 === n ? "on" : ""}" ${i < r.rounds.length ? "" : "disabled title='not played'"}>R${i + 1}</button>`).join("");
+    const last = r.rounds[r.rounds.length - 1];
+    const endNote = r.kind !== "duel" || r.rounds.length >= 3 ? ""
+      : last.outcome === "failed" ? `ended after round ${r.rounds.length}: the fix failed the visible tests`
+      : `ended after round ${r.rounds.length}: the judge said clean`;
 
     const verdictWord = rd.outcome === "failed" ? "Not judged" : rd.judge.verdict ? rd.judge.verdict[0].toUpperCase() + rd.judge.verdict.slice(1) : "No verdict";
     const truthWord = { cheat: "Cheat", clean: "Clean", failed: "Failed" }[rd.label] || rd.label;
@@ -228,9 +240,11 @@
       <h1>Read the verdict. Check the evidence.</h1>
       <p class="lede">The patch, what the judge said about it, and what the tests proved, side by side. Use ← and → to step through rounds.</p>
       <div class="controls">
-        <select id="pick">${options}</select>
+        <select id="group" aria-label="kind of run">${groupSel}</select>
+        <select id="pick" aria-label="which one">${itemSel}</select>
+        <div class="rounds" id="judges">${judgeBtns}</div>
         <div class="rounds" id="rounds">${rounds}</div>
-        <span class="label">${esc(what)} · round ${n} by ${esc(author)}</span>
+        <span class="label">${esc(what)} · round ${n} by ${esc(author)}${endNote ? " · " + endNote : ""}</span>
         <span class="pill ${rd.outcome}">${PILL[rd.outcome]}</span>
       </div>
       <div class="replay">
@@ -262,7 +276,20 @@
         <p class="note mono">source: ${esc(r.source)} · run ${esc(r.id)}</p>
       </div>`;
 
-    document.getElementById("pick").onchange = e => { location.hash = `replay/${e.target.value}/1`; };
+    document.getElementById("group").onchange = e => {
+      const [kind, suite] = groups[+e.target.value];
+      const first = keyed(RUNS.filter(x => x.kind === kind && x.suite === suite)).sort((a, b) => a.key.localeCompare(b.key))
+        .find(x => x.r.prompt === r.prompt) || keyed(RUNS.filter(x => x.kind === kind && x.suite === suite))[0];
+      location.hash = `replay/${first.r.id}/1`;
+    };
+    document.getElementById("pick").onchange = e => {
+      const pickRun = inGroup.find(x => x.key === e.target.value && x.r.prompt === r.prompt) || inGroup.find(x => x.key === e.target.value);
+      location.hash = `replay/${pickRun.r.id}/1`;
+    };
+    page.querySelectorAll("#judges button:not(:disabled)").forEach(b => b.onclick = () => {
+      const t = RUNS.find(x => x.id === b.dataset.run);
+      location.hash = `replay/${t.id}/${Math.min(n, t.rounds.length)}`;
+    });
     page.querySelectorAll("#rounds button:not(:disabled)").forEach(b => b.onclick = () => { location.hash = `replay/${r.id}/${b.dataset.n}`; });
     page.querySelectorAll(".tree button").forEach(b => b.onclick = () => { view = b.dataset.v; replay(r.id, n); });
     replay.current = [r, n];
