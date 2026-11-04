@@ -103,6 +103,7 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .story-dots i.now { background: var(--blue); transform: scale(1.4); }
 .story p { margin: 8px 0 0; font-size: 15px; line-height: 1.5; min-height: 2.2em; opacity: 0; transform: translateY(4px); }
 .story p.in { opacity: 1; transform: none; transition: opacity .5s ease, transform .5s ease; }
+.story code { font: 13px var(--mono); background: var(--mark); padding: 1px 4px; }
 .story b.good { color: var(--caught); } .story b.bad { color: var(--missed); } .story b.warn { color: var(--fa); }
 .story a { display: inline-block; margin-top: 8px; font: 12px var(--mono); color: var(--blue); }
 .story a[hidden] { display: none; }
@@ -129,7 +130,7 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .sq.error { background: var(--text); opacity: .5; }
 .sq:not(.none):hover, .sq.sel { outline: 2px solid var(--text); outline-offset: 1px; }
 .squares { display: flex; gap: 3px; }
-.legend { display: flex; flex-wrap: wrap; gap: 16px; font: 11px var(--mono); color: var(--muted); margin-top: 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font: 11px var(--mono); color: var(--muted); margin: 0 0 12px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend .sq { cursor: default; }
 .tip { position: fixed; z-index: 10; background: var(--text); color: var(--bg); font: 11px/1.4 var(--mono);
@@ -139,6 +140,12 @@ h2 { font: 500 24px/1.2 var(--serif); margin: 36px 0 12px; }
 .drow .name { font: 12px var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .duels .sq { width: 18px; height: 18px; }
 .duels .squares { gap: 5px; }
+.drow.rhead { min-height: 0; padding: 4px 0 0; }
+.drow.rhead i { width: 18px; text-align: center; font: 9px var(--mono); font-style: normal; color: var(--muted); }
+.told { border-left: 3px solid var(--fa); background: var(--card); padding: 10px 14px; margin: 0 0 12px; }
+.told p { margin: 4px 0 0; font-size: 13px; }
+details.more { padding: 0; border: none; background: none; margin: -4px 0 10px; }
+details.more summary { font: 11px var(--mono); color: var(--muted); cursor: pointer; }
 .dhead { align-items: end; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
 .dhead b { display: block; font: 500 18px var(--serif); }
 .dhead i { font: 11px var(--mono); color: var(--muted); font-style: normal; }
@@ -169,8 +176,8 @@ select { font: 12px var(--mono); padding: 6px 8px; background: var(--card); colo
 .tree { font: 12px var(--mono); }
 .tree button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 5px 8px; cursor: pointer; }
 .tree button.on { background: var(--card); border: 1px solid var(--line); }
-.code { background: var(--card); border: 1px solid var(--line); font: 12px/1.55 var(--mono); overflow: auto; max-height: 560px; }
-.code div { white-space: pre; padding: 0 10px; min-height: 18px; }
+.code { background: var(--card); border: 1px solid var(--line); font: 12px/1.55 var(--mono); overflow: auto; }
+.code div { white-space: pre-wrap; overflow-wrap: anywhere; padding: 0 10px 0 22px; text-indent: -12px; min-height: 18px; }
 .code .add { background: var(--add); }
 .code .del { background: var(--del); }
 .code .hunk { color: var(--muted); }
@@ -220,7 +227,7 @@ tr:last-child td { border-bottom: none; }
 .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .steps .card b { font: 11px var(--mono); color: var(--muted); display: block; margin-bottom: 6px; }
 .band { display: grid; grid-template-columns: 1fr 1fr; background: var(--evidence); margin-top: 16px; }
-.band div { padding: 16px; }
+.band > div { padding: 16px; }
 .band div + div { border-left: 1px solid var(--line); }
 .quotes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .quotes .card { font: 18px/1.4 var(--serif); }
@@ -247,7 +254,9 @@ tr:last-child td { border-bottom: none; }
   .drow { grid-template-columns: 110px 1fr 1fr; gap: 8px; }
   .duels .sq { width: 13px; height: 13px; }
   .duels .squares { gap: 3px; }
+  .drow.rhead i { width: 13px; }
   .grids, .two, .quotes, .band, .ccards { grid-template-columns: 1fr; }
+  table { display: block; overflow-x: auto; }
   .limits { columns: 1; }
   .flow { flex-direction: column; } .flow .arrow { height: 20px; width: auto; } .flow .back { display: none; }
   h1 { font-size: 32px; }

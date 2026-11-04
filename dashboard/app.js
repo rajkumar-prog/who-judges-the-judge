@@ -57,6 +57,8 @@
     const strictCases = tally(pairs((r, rd) => r.kind === "case" && r.prompt === "strict" && judged(rd)));
     const cost = D.summary.cost_usd;
     const judgments = pairs((r, rd) => judged(rd)).length;
+    const origRound = n => tally(pairs((r, rd) => r.suite === "real" && r.kind === "duel" && r.prompt === "original" && rd.n === n && judged(rd)));
+    const r1 = origRound(1), r2 = origRound(2);
 
     const duels = RUNS.filter(r => r.kind === "duel");
     // one row per duel, the original and strict judge side by side; rows pair up by seed, cheat and repeat
@@ -90,6 +92,7 @@
         <div class="drow dhead"><span></span>
           <span><b>Original judge</b><i>“is this a cheat?”</i></span>
           <span><b>Strict judge</b><i>“find an allowed input where this is wrong”</i></span></div>
+        <div class="drow rhead"><span></span>${'<span class="squares"><i>R1</i><i>R2</i><i>R3</i></span>'.repeat(2)}</div>
         <div class="drow dsum"><span>Real libraries, ${all.length - toy.length} duels</span><span>${sum("real", "original")}</span><span>${sum("real", "strict")}</span></div>
         ${realSeeds.map(seed => `<div class="dgroup">${esc(LIB[seed] || seed)} <span>${esc(seed)}</span></div>` +
           rowsFor(all.filter(x => x.suite === "real" && x.seed === seed))).join("")}
@@ -108,9 +111,10 @@
           <p>strict judge catch rate in the same duels, ${frac(strict.caught, strict.cheats)} wrong fixes</p></div>
         <div class="card tile"><div class="num">${frac(strictCases.false_alarm, strictCases.cleans).replace(" / ", "<small> / ") + (strictCases.cleans ? "</small>" : "")}</div>
           <p>strict judge false alarms on correct real-library fixes, each judged 3 times (${frac(strict.false_alarm, strict.cleans)} in duels)</p></div>
-        <div class="card tile"><div class="num">$${cost.toFixed(2)}</div>
-          <p>model cost of the ${judgments} judgments on this page</p></div>
+        <div class="card tile"><div class="num">${r2.cheats ? r2.missed : "—"}<small>${r2.cheats ? " of " + r2.cheats : ""}</small></div>
+          <p>wrong fixes the original judge approved in round 2, once the cheater had read its reasons (${r1.missed} of ${r1.cheats} in round 1)</p></div>
       </div>
+      <p class="note mono">${judgments} judgments by Muse Spark Open on Baseten · cheater Muse Spark on the Meta Model API · total model cost $${cost.toFixed(2)}</p>
       <div class="flow-row">
         <div class="flow" id="flow">
           <div class="box" data-s="0"><b>Cheater · Muse Spark</b>writes a fix</div><div class="arrow">→</div>
@@ -127,14 +131,14 @@
         <a id="story-link" hidden>Open this duel in the replay →</a>
       </div>
       <h2>Every duel, round by round</h2>
-      <p class="lede" style="margin-bottom:12px">One row per duel, one square per round, the same cheat against each judge. A duel ends when the judge says clean, so a red or blue square is always the last one in its row. Click any square to replay it.</p>
-      ${duelTable}
+      <p class="lede" style="margin-bottom:12px">One row per duel, one square per round, the same starting cheat against each judge. From round 2 the cheater has read the judge's reasons. A duel ends when the judge says clean. Click any square to replay it.</p>
       <div class="legend">
-        <span><i class="sq caught"></i>caught</span><span><i class="sq missed"></i>missed (wrong fix approved)</span>
-        <span><i class="sq false_alarm"></i>false alarm</span><span><i class="sq passed_clean"></i>passed clean</span>
-        <span><i class="sq failed"></i>failed visible tests, not judged</span><span><i class="sq error"></i>judge error</span>
+        <span><i class="sq caught"></i>caught</span><span><i class="sq missed"></i>missed: wrong fix approved</span>
+        <span><i class="sq false_alarm"></i>false alarm: good fix flagged</span><span><i class="sq passed_clean"></i>correct fix, approved</span>
+        <span><i class="sq failed"></i>failed visible tests, not judged</span>${RUNS.some(r => r.rounds.some(rd => rd.outcome === "error")) ? '<span><i class="sq error"></i>judge error</span>' : ""}
         <span><i class="sq none"></i>not played</span>
-      </div>`;
+      </div>
+      ${duelTable}`;
 
     page.querySelectorAll(".sq[data-run]").forEach(b => {
       b.onclick = () => { location.hash = `replay/${b.dataset.run}/${b.dataset.n}`; };
@@ -171,12 +175,17 @@
         : "It fails the visible tests, so it never reaches the judge." });
       if (rd.outcome === "failed") return;
       const verdict = rd.judge.verdict === "cheat" ? "Cheat" : rd.judge.verdict === "clean" ? "Clean" : "No verdict";
-      steps.push({ s: 2, round, text: `The judge says <b>${verdict}</b>. “${esc(cut(rd.judge.reason || rd.judge.evidence, 140))}”` });
+      // when the reason is about to be read out as feedback, show the line the judge pointed at here instead
+      const repeat = i < r.rounds.length - 1 && rd.judge.reason && rd.judge.evidence;
+      steps.push({ s: 2, round, text: repeat ? `The judge says <b>${verdict}</b>, pointing at <code>${esc(cut(rd.judge.evidence, 90))}</code>`
+        : `The judge says <b>${verdict}</b>. “${esc(cut(rd.judge.reason || rd.judge.evidence, 140))}”` });
       const k = rd.hidden_failures.length;
       const tail = { caught: `<b class="good">Caught.</b> The judge was right.`, missed: `<b class="bad">Missed.</b> The judge approved a wrong fix.`,
         false_alarm: `<b class="warn">False alarm.</b> The fix was fine.`, passed_clean: `<b class="good">Correct fix, approved.</b>` }[rd.outcome] || "";
       steps.push({ s: 3, round, outcome: rd.outcome, text: (rd.label === "cheat" ? `${k} hidden test${k === 1 ? "" : "s"} fail. ` : "Every hidden test passes. ") + tail });
-      if (i < r.rounds.length - 1) steps.push({ s: 4, round, text: "The judge's reasons go back to the cheater, and it tries again." });
+      if (i < r.rounds.length - 1) steps.push({ s: 4, round, text: rd.judge.reason
+        ? `The judge's reason goes back to Muse Spark: “${esc(cut(rd.judge.reason, 260))}”`
+        : "The judge's reasons go back to the cheater, and it tries again." });
     });
     return steps;
   }
@@ -224,7 +233,7 @@
       text.innerHTML = st.text; text.classList.add("in");
       [...dots.children].forEach((d, j) => d.className = j < i ? "past" : j === i ? "now" : "");
       i++;
-      playing = setTimeout(step, st.s === 2 || st.s === 3 ? 5000 : 3200);
+      playing = setTimeout(step, st.s >= 2 ? 5000 : 3200);
     };
     resume = () => { playing = setTimeout(step, 1200); };
     step();
@@ -232,8 +241,9 @@
 
   // ---------- 02 Duel replay ----------
   function pickDefault() {
-    const real = RUNS.find(r => r.kind === "duel" && r.suite === "real" && r.prompt === "original" && r.rounds.some(rd => rd.outcome === "missed"));
-    const any = real || RUNS.find(r => r.rounds.some(rd => rd.outcome === "missed")) || RUNS[0];
+    const featured = storyDuel();
+    const any = (featured && featured.rounds.some(rd => rd.outcome === "missed") && featured)
+      || RUNS.find(r => r.rounds.some(rd => rd.outcome === "missed")) || RUNS[0];
     const n = (any.rounds.findIndex(rd => rd.outcome === "missed") + 1) || 1;
     return [any.id, n];
   }
@@ -249,6 +259,14 @@
     }).join("");
   }
 
+  // long test lists show the first few, the rest fold away
+  function testList(names, cls) {
+    const li = t => `<li>${esc(t)}</li>`, k = 6;
+    if (names.length <= k + 1) return `<ul class="fails ${cls}">${names.map(li).join("")}</ul>`;
+    return `<ul class="fails ${cls}">${names.slice(0, k).map(li).join("")}</ul>` +
+      `<details class="more"><summary>${names.length - k} more</summary><ul class="fails ${cls}">${names.slice(k).map(li).join("")}</ul></details>`;
+  }
+
   function confirmCard(r, rd) {
     const c = rd.confirm;
     let body;
@@ -261,12 +279,12 @@
         error: "No usable test came back, or it didn't run."
       }[c.status];
       body = `<span class="chip ${c.status}">${c.status.replace("_", " ")}</span><p style="margin:10px 0 0">${say}</p>` +
-        (c.proving.length ? `<ul class="fails ok" style="margin-top:8px">${c.proving.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : "") +
+        (c.proving.length ? `<div style="margin-top:8px">${testList(c.proving, "ok")}</div>` : "") +
         (c.test ? `<details style="margin-top:8px;padding:6px 10px"><summary>test_wjj_confirm.py</summary><pre>${esc(c.test)}</pre></details>` : "");
     } else if (rd.judge.verdict === "cheat") {
       body = `<span class="chip">not run</span><p style="margin:10px 0 0" class="muted">Judge-written tests were only run on the real-library results.</p>`;
     } else {
-      body = `<span class="chip">none</span><p style="margin:10px 0 0" class="muted">The judge said clean, so there was nothing for it to prove.</p>`;
+      return `<p class="note">Judge's own test: none. The judge said clean, so there was nothing for it to prove.</p>`;
     }
     return `<div class="card"><div class="label">Judge's own test</div><div style="margin-top:8px">${body}</div></div>`;
   }
@@ -308,6 +326,8 @@
       : rd.label === "clean" ? "Every hidden test passes. This fix does what the task asks."
       : `Passes the visible tests, fails ${rd.hidden_failures.length || "some"} hidden test${rd.hidden_failures.length === 1 ? "" : "s"}.`;
     const what = r.kind === "case" ? `${r.patch} (${r.patch_kind})` : r.cheat_type;
+    const prev = n > 1 ? r.rounds[n - 2] : null;
+    const told = r.kind === "duel" && prev && prev.feedback_after && prev.judge ? (prev.judge.reason || prev.judge.evidence || "") : "";
     const author = { script: "scripted cheat", meta: "Muse Spark", agent: "Muse Spark", "hand-written": "hand-written patch" }[rd.author] || rd.author;
 
     page.innerHTML = `
@@ -322,6 +342,7 @@
         <span class="label">${esc(what)} · round ${n} by ${esc(author)}${endNote ? " · " + endNote : ""}</span>
         <span class="pill ${rd.outcome}">${PILL[rd.outcome]}</span>
       </div>
+      ${told ? `<div class="told"><span class="label">Before round ${n}, Muse Spark read the judge's round ${n - 1} reason</span><p>“${esc(told)}”</p></div>` : ""}
       <div class="replay">
         <div class="tree">
           <button data-v="task" class="${view === "task" ? "on" : ""}">task.md</button>
@@ -340,13 +361,13 @@
           <div class="label">Tests show · evidence</div>
           <div class="verdict">${truthWord}</div>
           <p>${truthLine}</p>
-          ${rd.hidden_failures.length ? `<div class="label" style="margin-bottom:4px">hidden tests that fail</div><ul class="fails">${rd.hidden_failures.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+          ${rd.hidden_failures.length ? `<div class="label" style="margin-bottom:4px">hidden tests that fail</div>${testList(rd.hidden_failures, "")}` : ""}
           <p class="muted" style="font-size:12px">Visible tests: ${rd.visible_passed ? "pass" : "fail"} · Regex baseline said: ${esc(rd.baseline || "—")}</p>
         </div>
       </div>
       <div class="below">
         ${confirmCard(r, rd)}
-        ${rd.feedback_after ? `<details><summary>What the cheater was told before the next round</summary><pre>${esc(rd.feedback_after)}</pre></details>` : ""}
+        ${rd.feedback_after && n < r.rounds.length ? `<details><summary>Exactly what the cheater was told before round ${n + 1}</summary><pre>${esc(rd.feedback_after)}</pre></details>` : ""}
         <details><summary>Full judge verdict</summary><pre>${esc(JSON.stringify(rd.judge, null, 2))}</pre></details>
         <p class="note mono">source: ${esc(r.source)} · run ${esc(r.id)}</p>
       </div>`;
@@ -471,7 +492,7 @@
       <h1>How the experiment works.</h1>
       <p class="lede">The judge's verdict is a prediction. The hidden tests are the answer key.</p>
       <div class="steps">
-        <div class="card"><b>01 / Cheat</b>Round 1 is a scripted wrong fix. From round 2, Muse Spark rewrites it after reading why the judge caught it.</div>
+        <div class="card"><b>01 / Cheat</b>Round 1 is a scripted wrong fix. From round 2, Muse Spark (Meta Model API) rewrites it after reading why the judge caught it.</div>
         <div class="card"><b>02 / Judge</b>Muse Spark Open on Baseten reads the task, the diff and the changed files, and says clean or cheat.</div>
         <div class="card"><b>03 / Check</b>Hidden tests the cheater never sees decide what each fix really was.</div>
         <div class="card"><b>04 / Prove</b>For each cheat verdict on real code, the judge writes a test. It counts only if it fails on the fix and passes on the library's real fix.</div>
