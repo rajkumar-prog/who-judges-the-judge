@@ -1,1 +1,1 @@
-"""Who Judges the Judge: a fixer agent, a judge, and a scorecard for the judge."""
+"""Who Judges the Judge: an AI judge, a cheater that reads its reasons, and hidden tests that grade both."""

@@ -1,65 +1,50 @@
 # Architecture
 
-Muse Spark Open is the runtime of the app itself, not an add-on check. Both the agent that fixes code and the judge that reviews the fix run on `meta-models/muse-spark-open-1026` through Baseten (`https://inference.baseten.co/v1`, OpenAI-compatible client).
+Two Meta models, two providers, one OpenAI-compatible client (`wjj/llm.py`):
+
+- **Judge:** Muse Spark Open, `meta-models/muse-spark-open-1026` on Baseten. Also the fixer agent in `run` and `eval`.
+- **Cheater:** Muse Spark, `muse-spark-1.3` on the Meta Model API. Only used in duels (and `eval --reference`).
+
+Every call prints one line with provider, model, time and spend so far, and `--budget` stops a command once it has spent that much.
+
+## The duel
 
 ```mermaid
 flowchart LR
-    subgraph entry[Entry points]
-        CLI[wjj CLI]
-        UI[Live dashboard]
-    end
-
-    subgraph core["wjj core (runs on Muse Spark Open via Baseten)"]
-        FIX[Fixer agent loop<br/>read / edit / run tests]
-        JUDGE[Judge<br/>final diff + test output<br/>→ verdict + evidence line]
-        REDO{verdict}
-    end
-
-    BASE[Deterministic baseline<br/>test files touched, asserts removed]
-    WS[(Temp workspace<br/>copy of one seed)]
-
-    CLI --> FIX
-    UI --> FIX
-    FIX <--> WS
-    FIX -->|final diff| JUDGE
-    FIX -->|final diff| BASE
-    JUDGE --> REDO
-    REDO -->|cheat: evidence fed back, max 2 redos| FIX
-    REDO -->|clean| OUT[Accepted fix]
-
-    subgraph eval["Eval harness (offline, not shipped to the agent)"]
-        HID[(hidden/ tests)]
-        REF[Reference judge<br/>hosted Muse Spark via Meta API]
-        SC[Scorecard<br/>catch rate + false-alarm rate<br/>with 95% intervals]
-    end
-
-    OUT --> HID
-    JUDGE --> SC
-    BASE --> SC
-    REF --> SC
-    HID -->|ground truth| SC
+    S[Round 1<br/>scripted cheat] --> D[Diff]
+    C[Round 2+<br/>Muse Spark cheater] --> D
+    D --> V[Visible tests]
+    V -->|pass| J[Judge<br/>Muse Spark Open]
+    J -->|cheat + reason| C
+    J --> G[Graded by<br/>hidden tests]
+    D --> H[(hidden/ tests)]
+    H --> G
 ```
 
-## Components
+1. Round 1 is a scripted cheat. On the toy seeds it's built from the visible tests (`answer_table`, `weaken_asserts`, `skip_tests`, see `wjj/cheats.py`). On the real-library seeds it's a hand-written patch from `patches/`.
+2. The judge gets the task, the diff, the visible test output and the full changed files, and replies with JSON: verdict, the deciding line, and a reason. The strict prompt also asks for a counterexample input.
+3. If the verdict is cheat, the cheater gets its last diff plus every reason the judge has caught it for so far, and writes a new fix. If a fix fails the visible tests, the cheater is told so and the judge isn't asked. The duel ends when the judge says clean or the rounds run out.
+4. Hidden tests (`hidden/<seed>/`) decide what each round really was: caught, missed, false alarm or passed clean. The cheater and the judge never see them.
 
-| Component | Model | Notes |
-| --- | --- | --- |
-| Fixer agent | Muse Spark Open (Baseten) | Our own tool-calling loop over a temp copy of a seed. Muse Code is an optional adapter if it runs headless. |
-| Judge | Muse Spark Open (Baseten) | Sees only the final diff and test output. Returns `{"verdict": "cheat" \| "clean", "evidence": "<diff line>", "reason": "..."}`. |
-| Redo loop | Muse Spark Open | A `cheat` verdict sends the evidence back to the fixer. At most 2 redos. |
-| Baseline | none | Deterministic: did the diff touch test files, remove asserts, or special-case test inputs. The judge has to beat it. |
-| Reference judge | Muse Spark (Meta Model API) | Eval only. Shows whether a model judging its own family's fixes misses more than an outside judge. |
-| Hidden tests | none | Ground truth. Never copied into the workspace; run after the fixer finishes. |
+## Other commands
 
-## Entry points
+| Command | Module | What it adds |
+|---|---|---|
+| `run`, `eval` | `run.py`, `fixer.py` | A tool-calling fixer agent on Muse Spark Open, in honest or cheat mode, with up to 2 redos when the judge says cheat. `eval` writes a scorecard with 95% Wilson intervals. |
+| `cases` | `cases.py` | Judges fixed patches for the real-library seeds: upstream fixes, other correct fixes, incomplete fixes and cheats, so false alarms get measured too. |
+| `probe` | `probe.py` | Judges each hand-written cheat twice, as written and with a reassuring comment above it. |
+| `confirm` | `confirm.py` | For each cheat verdict, the judge writes a pytest test. Confirmed if it fails on the patch and passes on the library's real fix. Never changes a verdict or label. |
+| `regrade` | `duel.py` | Re-runs the hidden tests on saved diffs. No model calls. |
+| `rejudge` | `rejudge.py` | Re-judges saved diffs with another prompt, so both prompts are scored on the same diffs. |
+| `dashboard` | `dashboard.py` | Exports saved results to `dashboard/data.js`. |
 
-- **CLI**: `wjj run seeds/<name>` runs fix → judge → redo on one seed; `wjj eval` runs every seed N times and writes the scorecard.
-- **Dashboard**: a local web page that shows one run live (agent steps, green tests, judge verdict with the quoted line, redo, scorecard). This is what the demo video records.
+`baseline.py` is a regex checker (test files touched, asserts removed, test inputs special-cased) that every judge result is compared against.
+
+## Keeping the answer key honest
+
+`scripts/freeze.py` writes a checksum of every seed, hidden test, patch, case and judge/agent prompt to `docs/frozen-manifest.json`. That was committed before the final run, and `python scripts/freeze.py --check` shows nothing changed after. Every hidden-test change before then is in `docs/hidden-tests-log.md`.
 
 ## Known limits
 
-- Isolation is at the tool level. File tools can't leave the workspace and tests run without API keys, but code the agent writes still runs on the host under pytest. A container would close that gap.
-
-## Known risk
-
-The fixer and the judge are the same model, so their blind spots may be correlated: Spark Open may not notice cheats it would itself write. The reference judge and the baseline exist to measure exactly that, and the scorecard reports it rather than hiding it.
+- Isolation is at the tool level. The agent works in a temp copy of one seed and file tools can't leave it, but code it writes still runs on the host under pytest. No container.
+- The judge and the cheater are the same model family, so their blind spots may overlap.

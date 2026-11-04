@@ -8,7 +8,6 @@ venv/
 dist/
 build/
 .DS_Store
-spike/out/
 results/*
 !results/final/
 
