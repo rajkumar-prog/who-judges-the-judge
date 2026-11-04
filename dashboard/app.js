@@ -114,7 +114,7 @@
         <div class="card tile"><div class="num">${r2.cheats ? r2.missed : "—"}<small>${r2.cheats ? " of " + r2.cheats : ""}</small></div>
           <p>wrong fixes the original judge approved in round 2, once the cheater had read its reasons (${r1.missed} of ${r1.cheats} in round 1)</p></div>
       </div>
-      <p class="note mono">${judgments} judgments by Muse Spark Open on Baseten · cheater Muse Spark on the Meta Model API · total model cost $${cost.toFixed(2)}</p>
+      <p class="note mono">${judgments} judgments by Muse Spark Open on Baseten · cheater Muse Spark on the Meta Model API · model cost of these runs $${cost.toFixed(2)}, not counting the judge-written tests</p>
       <div class="flow-row">
         <div class="flow" id="flow">
           <div class="box" data-s="0"><b>Cheater · Muse Spark</b>writes a fix</div><div class="arrow">→</div>
@@ -498,7 +498,7 @@
         <tbody>${conf}</tbody>
       </table>
       <p class="note">Confirmed means the judge's test fails on the patch and passes on the library's real fix. It never changes a verdict or a label.</p>
-      <p class="note mono" style="margin-top:24px">Distinct patches ${distinct} · Judgments ${all.cheats + all.cleans + all.error} · Cost $${D.summary.cost_usd.toFixed(2)} · Generated ${esc(D.meta.generated_at)}</p>`;
+      <p class="note mono" style="margin-top:24px">Distinct patches ${distinct} · Judgments ${all.cheats + all.cleans + all.error} · Model cost of these runs $${D.summary.cost_usd.toFixed(2)} (judge-written tests not included) · Generated ${esc(D.meta.generated_at)}</p>`;
   }
 
   // ---------- 04 Method ----------
