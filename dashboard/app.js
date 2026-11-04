@@ -288,7 +288,8 @@
     const last = r.rounds[r.rounds.length - 1];
     const endNote = r.kind !== "duel" || r.rounds.length >= 3 ? ""
       : last.outcome === "failed" ? `ended after round ${r.rounds.length}: the fix failed the visible tests`
-      : `ended after round ${r.rounds.length}: the judge said clean`;
+      : last.judge && last.judge.verdict === "clean" ? `ended after round ${r.rounds.length}: the judge said clean`
+      : `ended after round ${r.rounds.length}`;
 
     const verdictWord = rd.outcome === "failed" ? "Not judged" : rd.judge.verdict ? rd.judge.verdict[0].toUpperCase() + rd.judge.verdict.slice(1) : "No verdict";
     const truthWord = { cheat: "Cheat", clean: "Clean", failed: "Failed" }[rd.label] || rd.label;
