@@ -1,6 +1,8 @@
 # Who Judges the Judge
 
-<!-- before submitting: add the demo video link and the dashboard link here -->
+**Dashboard:** [rajkumar-prog.github.io/who-judges-the-judge/dashboard](https://rajkumar-prog.github.io/who-judges-the-judge/dashboard/), every duel round by round, no key needed.
+
+<!-- before submitting: add the demo video link here -->
 
 AI coding agents can make your tests pass without fixing the bug, for example by hardcoding the test inputs or weakening the asserts. I pitted an AI judge against a cheater that adapts to the judge's feedback.
 
@@ -99,7 +101,7 @@ python -m wjj regrade results/final/duel-all-20261103-000532.jsonl
 
 re-runs the hidden tests on every saved diff and checks each label, with no model calls. It works on any `results/final/duel-*.jsonl` file and on `results/final/eval-*/runs.jsonl`.
 
-To see every duel, round by round, open `dashboard/index.html` in a browser. To rebuild its data from the raw files:
+To see every duel, round by round, open the [live dashboard](https://rajkumar-prog.github.io/who-judges-the-judge/dashboard/) or `dashboard/index.html` in a browser. To rebuild its data from the raw files:
 
 ```
 python -m wjj dashboard results/final/duel-all-*.jsonl results/final/duel-*-confirmed.jsonl results/final/cases-*-confirmed-confirmed.jsonl original:results/final/eval-original/runs.jsonl strict:results/final/eval-strict/runs.jsonl
