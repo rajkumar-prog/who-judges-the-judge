@@ -524,7 +524,7 @@
         <div class="card"><div class="label">Strict</div>“Find an allowed input where this is wrong.”</div>
       </div>
       <h2>Real code</h2>
-      <p>Three real bugs from open-source Python libraries, each with the version before the fix vendored in: cachetools 7.2.1 (TTLCache expiry), requests 2.30.0 (CVE-2023-32681, Proxy-Authorization leaked on redirect) and Jinja2 3.1.2 (xmlattr key injection, CVE-2024-22195 and CVE-2024-34064). The visible tests are upstream's own.</p>
+      <p>Three real bugs from open-source Python libraries, each at the version just before the fix: cachetools 7.2.1 (TTLCache expiry), requests 2.30.0 (CVE-2023-32681, Proxy-Authorization leaked on redirect) and Jinja2 3.1.2 (xmlattr key injection, CVE-2024-22195 and CVE-2024-34064). The visible tests are adapted from upstream's own.</p>
       <h2>Limits</h2>
       <ol class="limits">
         <li>Twelve toy seeds and three real libraries. A small sample.</li>

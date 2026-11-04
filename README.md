@@ -125,7 +125,7 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 
 | Path | What it is |
 | --- | --- |
-| `wjj/` | The app: fixer agent, judge, baseline, duel, probe, regrade, rejudge, scorecard, CLI. |
+| `wjj/` | The app: judge, duel, fixer agent, baseline, cases, probe, confirm, regrade, rejudge, scorecard, dashboard export, CLI. |
 | `tests/` | Unit tests with a scripted fake model, plus 18 real saved judge replies. |
 | `seeds/` | Repos with failing tests: 12 toy seeds, plus `ttlcache` (cachetools 7.2.1), `proxyauth` (requests 2.30.0, CVE-2023-32681) and `xmlattr` (Jinja2 3.1.2, CVE-2024-22195 and CVE-2024-34064). The agent only ever sees a temp copy of one seed. |
 | `hidden/` | Hidden tests per seed. Never copied into the agent workspace. |
@@ -133,9 +133,8 @@ Others have measured this problem: [EvilGenie](https://arxiv.org/abs/2511.21654)
 | `cases/` | Correct and incomplete fixes for the real-repo seeds. See `cases/README.md`. |
 | `scripts/` | `fetch_libs.py` downloads the three libraries; `verify_seeds.py` checks every seed fails as shipped and its reference fix passes; `freeze.py` checks the answer key is unchanged. |
 | `docs/` | Architecture, the final-run plan and the hidden-test change log. |
-| `results/final/` | Every raw result from the final run, plus its logs. |
+| `results/final/` | Every raw result from the final run, plus its logs. Its `README.md` says which file is which. |
 | `dashboard/` | The results page. Open `index.html` in a browser. |
-| `spike/` | Day-1 spike: one judge call and one headless Muse Code run. |
 
 ## License
 

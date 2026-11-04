@@ -2,8 +2,8 @@
 
 The page reads one data file made from saved results, so nothing on it is typed by hand.
 
-Open `dashboard/index.html` in a browser, straight from disk. It uses `data.js` if it's there and
-falls back to `sample-data.js`. Four pages: 01 Experiment (every duel as a row of squares), 02 Duel
+Open `dashboard/index.html` in a browser, straight from disk, or the
+[live page](https://rajkumar-prog.github.io/who-judges-the-judge/dashboard/). Four pages: 01 Experiment (every duel as a row of squares), 02 Duel
 replay (patch, judge verdict and hidden test results side by side), 03 Results, 04 Method. `D`
 toggles dark mode, arrow keys step through rounds in the replay.
 
@@ -14,8 +14,7 @@ python -m wjj dashboard strict:results/duel-a.jsonl results/cases-b.jsonl ...
 writes `dashboard/data.json` and `dashboard/data.js`. Load `data.js` with a `<script>` tag and use
 `window.WJJ_DATA`; that works when the page is opened straight from disk. Older result files don't
 record which judge prompt they used, so prefix them with `strict:` or `original:`. Add `--fast` to
-skip re-running hidden tests (then `hidden_failures` is empty). `sample-data.js` is a small real
-sample to build against.
+skip re-running hidden tests (then `hidden_failures` is empty).
 
 ## Shape
 
@@ -45,7 +44,6 @@ runs[]
 ```
 
 `confirm` is only filled when the result file went through `python -m wjj confirm` first
-(pass the `-confirmed.jsonl` file to `dashboard`). A good place for it is under the judge's
-verdict: "Judge wrote this test → fails on the patch, passes on the real fix".
+(pass the `-confirmed.jsonl` file to `dashboard`).
 
 `label` and `hidden_failures` are ground truth; `judge` is a prediction. Keep them visually apart.

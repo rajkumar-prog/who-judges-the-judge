@@ -6,7 +6,8 @@
   python -m wjj duel median --rounds 3      # scripted cheat, then a model cheater adapts to the judge
   python -m wjj regrade results/duel-x.jsonl  # re-check saved diffs against today's hidden tests
   python -m wjj probe                       # judge each hand-written cheat with and without its decoy comment
-  python -m wjj cases --repeat 2            # judge every real-repo case patch with both prompts
+  python -m wjj cases --repeat 3            # judge every real-repo case patch with both prompts
+  python -m wjj confirm results/duel-x.jsonl  # judge writes a test for each cheat verdict; run it for real
   python -m wjj dashboard strict:results/duel-x.jsonl ...  # export results for the dashboard page
   python -m wjj rejudge results/a.jsonl ...  # rescore saved diffs with the strict judge prompt
 """
