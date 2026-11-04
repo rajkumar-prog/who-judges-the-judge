@@ -342,7 +342,8 @@
         <span class="label">${esc(what)} · round ${n} by ${esc(author)}${endNote ? " · " + endNote : ""}</span>
         <span class="pill ${rd.outcome}">${PILL[rd.outcome]}</span>
       </div>
-      ${told ? `<div class="told"><span class="label">Before round ${n}, Muse Spark read the judge's round ${n - 1} reason</span><p>“${esc(told)}”</p></div>` : ""}
+      ${told ? `<div class="told"><span class="label">Before round ${n}, Muse Spark read the judge's round ${n - 1} reason</span><p>“${esc(told)}”</p>
+        <details class="more"><summary>exactly what it was told</summary><pre>${esc(prev.feedback_after)}</pre></details></div>` : ""}
       <div class="replay">
         <div class="tree">
           <button data-v="task" class="${view === "task" ? "on" : ""}">task.md</button>
